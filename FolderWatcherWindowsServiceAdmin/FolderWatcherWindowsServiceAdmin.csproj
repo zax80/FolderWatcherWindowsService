@@ -47,14 +47,26 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Controls\LogViewerControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Controls\LogViewerControl.Designer.cs">
+      <DependentUpon>LogViewerControl.cs</DependentUpon>
+    </Compile>
     <Compile Include="FolderWatcherWindowsServiceAdmin.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="FolderWatcherWindowsServiceAdmin.Designer.cs">
       <DependentUpon>FolderWatcherWindowsServiceAdmin.cs</DependentUpon>
     </Compile>
+    <Compile Include="Models\LogEntry.cs" />
+    <Compile Include="Models\LogSummary.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Services\LogParser.cs" />
+    <EmbeddedResource Include="Controls\LogViewerControl.resx">
+      <DependentUpon>LogViewerControl.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="FolderWatcherWindowsServiceAdmin.resx">
       <DependentUpon>FolderWatcherWindowsServiceAdmin.cs</DependentUpon>
     </EmbeddedResource>
@@ -79,6 +91,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="ServiceLog.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

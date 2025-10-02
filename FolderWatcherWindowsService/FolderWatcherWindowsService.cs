@@ -6,128 +6,90 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.ServiceProcess;
+using System.Threading;
 
 namespace FolderWatcherWindowsService
 {
+    /// <summary>
+    /// Windows Service that monitors specified folders for file system changes and logs them in CSV format.
+    /// </summary>
     public partial class FolderWatcherWindowsService : ServiceBase
     {
-        // Log4Net
-        private ILog mLogger;
-
-        // Collection for the FileSystemWatcher objects
-        private List<FileSystemWatcher> fileSystemWatchers;
+        private readonly ILog _logger;
+        private readonly WatcherManager _watcherManager;
+        private readonly CsvLogger _csvLogger;
 
         public FolderWatcherWindowsService()
         {
             InitializeComponent();
+
+            ConfigureLog4Net();
+            _logger = LogManager.GetLogger("servicelog");
+            _csvLogger = new CsvLogger(_logger);
+            _watcherManager = new WatcherManager(_logger, _csvLogger);
         }
 
         protected override void OnStart(string[] args)
         {
-            // write entry in event log
-            EventLog.WriteEntry("Folder Watcher Windows Service is starting.", EventLogEntryType.Information);
+            try
+            {
+                LogServiceEvent("Folder Watcher Windows Service is starting.", EventLogEntryType.Information);
+                _logger?.Info("Service starting - initializing folder watchers");
 
-            // get log Log4 configuration from App.config
-            ConfigureLog4Net();
+                _csvLogger.WriteHeader();
+                _watcherManager.StartWatching(Properties.Settings.Default.FolderPaths);
 
-            // start watching of folders
-            StartWatching();
+                _logger?.Info("Service started successfully");
+            }
+            catch (Exception ex)
+            {
+                LogServiceError("Failed to start service", ex);
+                throw;
+            }
         }
 
         protected override void OnStop()
         {
-            EventLog.WriteEntry("Folder Watcher Windows Service is stoping.", EventLogEntryType.Information);
-
-            StopWatching();
-        }
-
-        /// <summary>
-        /// Get folder paths, create FileSystemWatcher instances & populate fileSystemWatchers collection.
-        /// </summary>
-        private void StartWatching()
-        {
-            // get folder paths from App.config
-            StringCollection folderPaths = Properties.Settings.Default.FolderPaths;
-
-            // create FileSystemWatcher instances for each path and attach event handlers
-            foreach (string path in folderPaths)
+            try
             {
-                if (fileSystemWatchers == null) { fileSystemWatchers = new List<FileSystemWatcher>(); }
-                try
-                {
-                    // create FileSystemWatcher instance
-                    FileSystemWatcher mFSW = new FileSystemWatcher(path);
-                    mFSW.EnableRaisingEvents = true;
-                    mFSW.IncludeSubdirectories = true;
+                LogServiceEvent("Folder Watcher Windows Service is stopping.", EventLogEntryType.Information);
+                _logger?.Info("Service stopping - cleaning up resources");
 
-                    // Log4Net log file filter
-                    string logFilePath = LogManager.GetRepository()
-                                  .GetAppenders()
-                                  .OfType<FileAppender>().First().File;
-                    string logFile = Path.GetFileName(logFilePath);
-                    string logFileFilter = "!" + logFile;
-                    mFSW.Filter = logFileFilter;
+                _watcherManager.StopWatching();
 
-                    // events
-                    mFSW.Created += SomethingHappenedToTheFolder;
-                    mFSW.Changed += SomethingHappenedToTheFolder;
-                    mFSW.Deleted += SomethingHappenedToTheFolder;
-                    mFSW.Renamed += SomethingHappenedToTheFolder;
-
-                    // add FileSystemWatcher to fileSystemWatchers List collection
-                    fileSystemWatchers.Add(mFSW);
-                }
-                catch (Exception exc)
-                {
-                    mLogger.Error(exc.ToString());
-                }
+                _logger?.Info("Service stopped successfully");
+            }
+            catch (Exception ex)
+            {
+                LogServiceError("Error during service stop", ex);
             }
         }
 
-        /// <summary>
-        /// Clean up unmanaged resources.
-        /// </summary>
-        private void StopWatching()
-        {
-            if (fileSystemWatchers != null)
-            {
-                foreach (FileSystemWatcher fileSystemWatcher in fileSystemWatchers)
-                {
-                    fileSystemWatcher.Dispose();
-                }
-            }
-        }
-
-        /// <summary>
-        /// FileSystemWatchers event handler.
-        /// </summary>
-        /// <param name="sender">FileSystemWatcher</param>
-        /// <param name="e">Arguments of type FileSystemEventArgs</param>
-        private void SomethingHappenedToTheFolder(object sender, FileSystemEventArgs e)
-        {
-            mLogger.Debug
-                (string.Format("{0} - \r\nFile event for: {1}",
-                e.ChangeType, e.FullPath));
-
-            Debug.WriteLine(string.Format("{0} - \r\n File event for: {1}",
-                e.ChangeType, e.FullPath));
-        }
-
-        /// <summary>
-        /// get log Log4 configuration from App.config
-        /// </summary>
         private void ConfigureLog4Net()
         {
             try
             {
                 log4net.Config.XmlConfigurator.Configure();
-                mLogger = LogManager.GetLogger("servicelog");
             }
             catch (Exception ex)
             {
-                EventLog.WriteEntry(ex.Message, EventLogEntryType.Error);
+                EventLog.WriteEntry($"Failed to configure Log4Net: {ex.Message}", EventLogEntryType.Error);
             }
+        }
+
+        private void LogServiceEvent(string message, EventLogEntryType type)
+        {
+            EventLog.WriteEntry(message, type);
+        }
+
+        private void LogServiceError(string message, Exception ex)
+        {
+            string errorMsg = $"{message}: {ex.Message}";
+            EventLog.WriteEntry(errorMsg, EventLogEntryType.Error);
+            _logger?.Error(errorMsg, ex);
         }
     }
 }
