@@ -328,7 +328,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.btnApplyFilters.Name = "btnApplyFilters";
             this.btnApplyFilters.Size = new System.Drawing.Size(94, 55);
             this.btnApplyFilters.TabIndex = 10;
-            this.btnApplyFilters.Text = "Apply";
+            this.btnApplyFilters.Text = "Apply filters";
             this.btnApplyFilters.UseVisualStyleBackColor = true;
             this.btnApplyFilters.Click += new System.EventHandler(this.BtnApplyFilters_Click);
             // 
@@ -339,7 +339,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.btnClearFilters.Name = "btnClearFilters";
             this.btnClearFilters.Size = new System.Drawing.Size(94, 55);
             this.btnClearFilters.TabIndex = 11;
-            this.btnClearFilters.Text = "Clear";
+            this.btnClearFilters.Text = "Clear filters";
             this.btnClearFilters.UseVisualStyleBackColor = true;
             this.btnClearFilters.Click += new System.EventHandler(this.BtnClearFilters_Click);
             // 

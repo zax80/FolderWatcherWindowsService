@@ -34,6 +34,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.ServiceProcess" />
     <Reference Include="System.Xml.Linq" />
@@ -53,6 +54,7 @@
     <Compile Include="Controls\LogViewerControl.Designer.cs">
       <DependentUpon>LogViewerControl.cs</DependentUpon>
     </Compile>
+    <Compile Include="FolderManager.cs" />
     <Compile Include="FolderWatcherWindowsServiceAdmin.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -67,9 +69,6 @@
     <EmbeddedResource Include="Controls\LogViewerControl.resx">
       <DependentUpon>LogViewerControl.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="FolderWatcherWindowsServiceAdmin.resx">
-      <DependentUpon>FolderWatcherWindowsServiceAdmin.cs</DependentUpon>
-    </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
@@ -79,6 +78,8 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <None Include="ClassDiagram1.cd" />
+    <None Include="PERFORMANCE_OPTIMIZATIONS.md" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>

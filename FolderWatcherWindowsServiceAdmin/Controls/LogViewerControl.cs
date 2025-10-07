@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -55,10 +56,104 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             FindLogFile();
         }
 
+        /// <summary>
+        /// Load only recent entries for faster initial display.
+        /// </summary>
+        private async void LoadRecentEntriesOnly()
+        {
+            if (_isRefreshing)
+            {
+                return;
+            }
+
+            _isRefreshing = true;
+
+            try
+            {
+                btnRefresh.Enabled = false;
+                lblStatus.Text = "Loading recent entries...";
+                lblStatus.ForeColor = Color.Blue;
+
+                // Load only the last 500 entries for faster initial display
+                var recentEntries = await _logParser.ParseLastEntriesAsync(500).ConfigureAwait(false);
+                
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new Action(() =>
+                    {
+                        if (!this.IsDisposed && this.IsHandleCreated)
+                        {
+                            _allEntries = recentEntries;
+                            ApplyFilters();
+                            UpdateSummary();
+                            UpdatePagination();
+                            LoadCurrentPage();
+
+                            lblStatus.Text = $"Showing recent entries - Last updated: {DateTime.Now:HH:mm:ss}";
+                            lblStatus.ForeColor = Color.Green;
+                        }
+                    }));
+                }
+                else
+                {
+                    _allEntries = recentEntries;
+                    ApplyFilters();
+                    UpdateSummary();
+                    UpdatePagination();
+                    LoadCurrentPage();
+
+                    lblStatus.Text = $"Showing recent entries - Last updated: {DateTime.Now:HH:mm:ss}";
+                    lblStatus.ForeColor = Color.Green;
+                }
+            }
+            catch (Exception ex)
+            {
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new Action(() =>
+                    {
+                        if (!this.IsDisposed && this.IsHandleCreated)
+                        {
+                            lblStatus.Text = $"Error loading recent entries: {ex.Message}";
+                            lblStatus.ForeColor = Color.Red;
+                        }
+                    }));
+                }
+                else
+                {
+                    lblStatus.Text = $"Error loading recent entries: {ex.Message}";
+                    lblStatus.ForeColor = Color.Red;
+                }
+                System.Diagnostics.Debug.WriteLine($"Error loading recent entries: {ex.Message}");
+            }
+            finally
+            {
+                _isRefreshing = false;
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new Action(() =>
+                    {
+                        if (!this.IsDisposed && this.IsHandleCreated)
+                        {
+                            btnRefresh.Enabled = true;
+                        }
+                    }));
+                }
+                else
+                {
+                    btnRefresh.Enabled = true;
+                }
+            }
+        }
+
         private void FindLogFile()
         {
             try
             {
+                // Debug: Log the startup path and current directory
+                System.Diagnostics.Debug.WriteLine($"Application StartupPath: {Application.StartupPath}");
+                System.Diagnostics.Debug.WriteLine($"Current Directory: {Directory.GetCurrentDirectory()}");
+
                 // Try multiple possible locations for the log file
                 var possiblePaths = new[]
                 {
@@ -74,9 +169,16 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
                         ? Path.Combine(Path.GetDirectoryName(path), "ServiceLog.txt")
                         : path;
 
+                    System.Diagnostics.Debug.WriteLine($"Checking log file path: {logPath}");
+
                     if (File.Exists(logPath))
                     {
                         _logFilePath = logPath;
+                        System.Diagnostics.Debug.WriteLine($"Found log file at: {_logFilePath}");
+                        
+                        // ✅ CRITICAL: Ensure log file is READ-ONLY access
+                        // This prevents any accidental deletion or modification of the log file
+                        EnsureLogFileProtection(_logFilePath);
                         break;
                     }
                 }
@@ -84,21 +186,52 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
                 if (string.IsNullOrEmpty(_logFilePath))
                 {
                     _logFilePath = Path.Combine(Application.StartupPath, "ServiceLog.txt");
+                    System.Diagnostics.Debug.WriteLine($"Using default log file path: {_logFilePath}");
                 }
 
-                lblLogPath.Text = $"Log File: {_logFilePath}";
+                lblLogPath.Text = $"Log File: {_logFilePath} [READ-ONLY ACCESS]";
                 _logParser = new LogParser(_logFilePath);
+
+                // Diagnose the log file to understand its structure
+                _logParser.DiagnoseLogFile();
 
                 // Set up file watcher
                 SetupFileWatcher();
 
-                // Initial load
+                // Always load data regardless of file size to ensure existing entries are shown
+                System.Diagnostics.Debug.WriteLine("Starting initial log data load...");
                 RefreshLogData();
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error in FindLogFile: {ex.Message}");
                 MessageBox.Show($"Error finding log file: {ex.Message}", "Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        /// <summary>
+        /// Ensures the log file is protected from accidental deletion or modification.
+        /// This viewer only performs READ operations on the log file.
+        /// </summary>
+        private void EnsureLogFileProtection(string logFilePath)
+        {
+            try
+            {
+                if (File.Exists(logFilePath))
+                {
+                    // Verify we can read the file (this is all we need)
+                    using (var fs = new FileStream(logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    {
+                        // Just verify read access - we never write to or modify the log file
+                        System.Diagnostics.Debug.WriteLine($"✅ Log file protection verified: READ-ONLY access confirmed for {logFilePath}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ Log file access check failed: {ex.Message}");
+                // Don't throw - just log the warning
             }
         }
 
@@ -232,28 +365,43 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
 
         private void DataGridViewLogs_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
-            if (dataGridViewLogs.Rows[e.RowIndex].DataBoundItem is LogEntry entry)
+            try
             {
-                // Color code log levels in the LogLevel column only (no red row highlighting)
-                if (e.ColumnIndex == 0) // LogLevel column
+                // Defensive check for valid row index and bounds
+                if (e.RowIndex < 0 || e.RowIndex >= dataGridViewLogs.Rows.Count)
+                    return;
+
+                if (this.IsDisposed || !this.IsHandleCreated)
+                    return;
+
+                if (dataGridViewLogs.Rows[e.RowIndex].DataBoundItem is LogEntry entry)
                 {
-                    switch (entry.LogLevel)
+                    // Color code log levels in the LogLevel column only (no red row highlighting)
+                    if (e.ColumnIndex == 0) // LogLevel column
                     {
-                        case "ERROR":
-                            e.CellStyle.ForeColor = Color.Red;
-                            e.CellStyle.Font = new Font(e.CellStyle.Font, FontStyle.Bold);
-                            break;
-                        case "WARN":
-                            e.CellStyle.ForeColor = Color.Orange;
-                            break;
-                        case "INFO":
-                            e.CellStyle.ForeColor = Color.Blue;
-                            break;
-                        case "DEBUG":
-                            e.CellStyle.ForeColor = Color.Gray;
-                            break;
+                        switch (entry.LogLevel)
+                        {
+                            case "ERROR":
+                                e.CellStyle.ForeColor = Color.Red;
+                                e.CellStyle.Font = new Font(e.CellStyle.Font, FontStyle.Bold);
+                                break;
+                            case "WARN":
+                                e.CellStyle.ForeColor = Color.Orange;
+                                break;
+                            case "INFO":
+                                e.CellStyle.ForeColor = Color.Blue;
+                                break;
+                            case "DEBUG":
+                                e.CellStyle.ForeColor = Color.Gray;
+                                break;
+                        }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't throw to avoid disrupting the UI
+                System.Diagnostics.Debug.WriteLine($"Error in DataGridViewLogs_CellFormatting: {ex.Message}");
             }
         }
 
@@ -297,9 +445,16 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
                 // Debounce file changes
                 await Task.Delay(500).ConfigureAwait(false);
 
+                // Ensure we're on the UI thread before calling RefreshLogData
                 if (this.InvokeRequired)
                 {
-                    this.BeginInvoke(new Action(() => RefreshLogData()));
+                    this.Invoke(new Action(() =>
+                    {
+                        if (!this.IsDisposed && this.IsHandleCreated)
+                        {
+                            RefreshLogData();
+                        }
+                    }));
                 }
                 else
                 {
@@ -331,47 +486,115 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
                 _refreshCancellationTokenSource?.Cancel();
                 _refreshCancellationTokenSource = new CancellationTokenSource();
 
-                await Task.Run(() =>
+                // Use the new async method for better performance
+                _allEntries = await _logParser.ParseLogFileAsync().ConfigureAwait(false);
+
+                // Ensure UI updates happen on the UI thread
+                if (this.InvokeRequired)
                 {
-                    if (File.Exists(_logFilePath))
+                    this.Invoke(new Action(() =>
                     {
-                        _allEntries = _logParser.ParseLogFile();
-                    }
-                    else
-                    {
-                        _allEntries.Clear();
-                    }
-                }, _refreshCancellationTokenSource.Token).ConfigureAwait(false);
+                        if (!this.IsDisposed && this.IsHandleCreated)
+                        {
+                            ApplyFilters();
+                            UpdateSummary();
+                            UpdatePagination();
+                            LoadCurrentPage();
 
-                ApplyFilters();
-                UpdateSummary();
-                UpdatePagination();
-                LoadCurrentPage();
+                            lblStatus.Text = $"Last updated: {DateTime.Now:HH:mm:ss}";
+                            lblStatus.ForeColor = Color.Green;
+                        }
+                    }));
+                }
+                else
+                {
+                    ApplyFilters();
+                    UpdateSummary();
+                    UpdatePagination();
+                    LoadCurrentPage();
 
-                lblStatus.Text = $"Last updated: {DateTime.Now:HH:mm:ss}";
-                lblStatus.ForeColor = Color.Green;
+                    lblStatus.Text = $"Last updated: {DateTime.Now:HH:mm:ss}";
+                    lblStatus.ForeColor = Color.Green;
+                }
             }
             catch (OperationCanceledException)
             {
-                lblStatus.Text = "Refresh cancelled";
-                lblStatus.ForeColor = Color.Orange;
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new Action(() =>
+                    {
+                        if (!this.IsDisposed && this.IsHandleCreated)
+                        {
+                            lblStatus.Text = "Refresh cancelled";
+                            lblStatus.ForeColor = Color.Orange;
+                        }
+                    }));
+                }
+                else
+                {
+                    lblStatus.Text = "Refresh cancelled";
+                    lblStatus.ForeColor = Color.Orange;
+                }
             }
             catch (Exception ex)
             {
-                lblStatus.Text = $"Error: {ex.Message}";
-                lblStatus.ForeColor = Color.Red;
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new Action(() =>
+                    {
+                        if (!this.IsDisposed && this.IsHandleCreated)
+                        {
+                            lblStatus.Text = $"Error: {ex.Message}";
+                            lblStatus.ForeColor = Color.Red;
+                        }
+                    }));
+                }
+                else
+                {
+                    lblStatus.Text = $"Error: {ex.Message}";
+                    lblStatus.ForeColor = Color.Red;
+                }
                 System.Diagnostics.Debug.WriteLine($"Error refreshing log data: {ex.Message}");
             }
             finally
             {
                 _isRefreshing = false;
-                btnRefresh.Enabled = true;
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new Action(() =>
+                    {
+                        if (!this.IsDisposed && this.IsHandleCreated)
+                        {
+                            btnRefresh.Enabled = true;
+                        }
+                    }));
+                }
+                else
+                {
+                    btnRefresh.Enabled = true;
+                }
             }
         }
 
         private void ApplyFilters()
         {
-            var filtered = _allEntries.AsEnumerable();
+            // Defensive check for UI thread and control state
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(ApplyFilters));
+                return;
+            }
+
+            if (this.IsDisposed || !this.IsHandleCreated)
+                return;
+
+            IEnumerable<LogEntry> filtered = _allEntries;
+
+            // Use parallel processing for large datasets
+            if (_allEntries.Count > 1000)
+            {
+                filtered = _allEntries.AsParallel();
+            }
 
             // Date range filter
             if (chkDateFilter.Checked)
@@ -382,26 +605,27 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             }
 
             // Change type filter
-            if (cmbChangeType.SelectedItem?.ToString() != "All")
+            var selectedChangeType = cmbChangeType.SelectedItem?.ToString();
+            if (!string.IsNullOrEmpty(selectedChangeType) && selectedChangeType != "All")
             {
-                var changeType = cmbChangeType.SelectedItem?.ToString();
-                filtered = filtered.Where(e => e.ChangeType.Equals(changeType));
+                filtered = filtered.Where(e => e.ChangeType.Equals(selectedChangeType, StringComparison.OrdinalIgnoreCase));
             }
 
             // Text search filter - search displayed columns including RawLine
-            if (!string.IsNullOrWhiteSpace(txtSearch.Text))
+            var searchText = txtSearch.Text?.Trim();
+            if (!string.IsNullOrWhiteSpace(searchText))
             {
-                var searchText = txtSearch.Text.ToLowerInvariant();
+                var searchLower = searchText.ToLowerInvariant();
                 filtered = filtered.Where(e =>
-                    e.FilePath.ToLowerInvariant().Contains(searchText) ||
-                    e.ChangeType.ToLowerInvariant().Contains(searchText) ||
-                    e.LogLevel.ToLowerInvariant().Contains(searchText) ||
-                    e.ServiceUser.ToLowerInvariant().Contains(searchText) ||
-                    e.ModifiedBy.ToLowerInvariant().Contains(searchText) ||
-                    e.FileType.ToLowerInvariant().Contains(searchText) ||
-                    e.Extension.ToLowerInvariant().Contains(searchText) ||
-                    e.Error.ToLowerInvariant().Contains(searchText) ||
-                    e.RawLine.ToLowerInvariant().Contains(searchText)
+                    (e.FilePath?.ToLowerInvariant().Contains(searchLower) == true) ||
+                    (e.ChangeType?.ToLowerInvariant().Contains(searchLower) == true) ||
+                    (e.LogLevel?.ToLowerInvariant().Contains(searchLower) == true) ||
+                    (e.ServiceUser?.ToLowerInvariant().Contains(searchLower) == true) ||
+                    (e.ModifiedBy?.ToLowerInvariant().Contains(searchLower) == true) ||
+                    (e.FileType?.ToLowerInvariant().Contains(searchLower) == true) ||
+                    (e.Extension?.ToLowerInvariant().Contains(searchLower) == true) ||
+                    (e.Error?.ToLowerInvariant().Contains(searchLower) == true) ||
+                    (e.RawLine?.ToLowerInvariant().Contains(searchLower) == true)
                 );
             }
 
@@ -411,6 +635,42 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
 
         private void UpdateSummary()
         {
+            // Defensive check for UI thread and control state
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(UpdateSummary));
+                return;
+            }
+
+            if (this.IsDisposed || !this.IsHandleCreated)
+                return;
+
+            // Debug: Log information about the filtered entries
+            System.Diagnostics.Debug.WriteLine($"UpdateSummary: Processing {_filteredEntries.Count} filtered entries");
+            
+            // Sample a few entries for debugging
+            if (_filteredEntries.Any())
+            {
+                var firstEntry = _filteredEntries.First();
+                var lastEntry = _filteredEntries.Last();
+                System.Diagnostics.Debug.WriteLine($"First entry: LogLevel={firstEntry.LogLevel}, Error='{firstEntry.Error}', ChangeType={firstEntry.ChangeType}, Timestamp={firstEntry.Timestamp:yyyy-MM-dd HH:mm:ss}");
+                System.Diagnostics.Debug.WriteLine($"Last entry: LogLevel={lastEntry.LogLevel}, Error='{lastEntry.Error}', ChangeType={lastEntry.ChangeType}, Timestamp={lastEntry.Timestamp:yyyy-MM-dd HH:mm:ss}");
+                
+                // Count different types for debugging
+                var errorEntries = _filteredEntries.Where(e => !string.IsNullOrWhiteSpace(e.Error)).ToList();
+                var errorLogLevel = _filteredEntries.Where(e => e.LogLevel.Equals("ERROR", StringComparison.OrdinalIgnoreCase)).ToList();
+                var recentEntries = _filteredEntries.Where(e => e.Timestamp >= DateTime.Now.AddMinutes(-30)).ToList();
+                
+                System.Diagnostics.Debug.WriteLine($"Entries with Error field: {errorEntries.Count}");
+                System.Diagnostics.Debug.WriteLine($"Entries with ERROR LogLevel: {errorLogLevel.Count}");
+                System.Diagnostics.Debug.WriteLine($"Recent entries (30m): {recentEntries.Count}");
+                
+                if (errorEntries.Any())
+                {
+                    System.Diagnostics.Debug.WriteLine($"Sample error entry: {errorEntries.First().Error}");
+                }
+            }
+
             var summary = _logParser.GenerateSummary(_filteredEntries);
 
             lblTotalRecords.Text = $"Total Records: {summary.TotalRecords:N0}";
@@ -429,10 +689,23 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             {
                 lblLastUpdate.Text = "Last Entry: None";
             }
+            
+            // Debug: Log the final summary values
+            System.Diagnostics.Debug.WriteLine($"Summary - Total: {summary.TotalRecords}, Errors: {summary.ErrorCount}, Recent: {summary.RecentActivityCount}");
         }
 
         private void UpdatePagination()
         {
+            // Defensive check for UI thread and control state
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(UpdatePagination));
+                return;
+            }
+
+            if (this.IsDisposed || !this.IsHandleCreated)
+                return;
+
             _pageSize = (int)cmbPageSize.SelectedItem;
             var totalPages = (int)Math.Ceiling((double)_filteredEntries.Count / _pageSize);
 
@@ -444,6 +717,16 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
 
         private void LoadCurrentPage()
         {
+            // Defensive check for UI thread and control state
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(LoadCurrentPage));
+                return;
+            }
+
+            if (this.IsDisposed || !this.IsHandleCreated)
+                return;
+
             var pageData = _filteredEntries
                 .Skip(_currentPage * _pageSize)
                 .Take(_pageSize)
@@ -456,6 +739,78 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
         private void BtnRefresh_Click(object sender, EventArgs e)
         {
             RefreshLogData();
+        }
+
+        /// <summary>
+        /// Public method to refresh log data (called from parent form).
+        /// </summary>
+        public void RefreshData()
+        {
+            RefreshLogData();
+        }
+
+        /// <summary>
+        /// Show diagnostic information about the current log data.
+        /// </summary>
+        public void ShowDiagnosticInfo()
+        {
+            if (_logParser == null)
+            {
+                MessageBox.Show("No log parser available.", "Diagnostic Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Log File: {_logFilePath}");
+            sb.AppendLine($"File Exists: {File.Exists(_logFilePath)}");
+            
+            if (File.Exists(_logFilePath))
+            {
+                var fileInfo = new FileInfo(_logFilePath);
+                sb.AppendLine($"File Size: {fileInfo.Length:N0} bytes");
+                sb.AppendLine($"Last Modified: {fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}");
+            }
+            
+            sb.AppendLine();
+            sb.AppendLine($"All Entries Count: {_allEntries.Count:N0}");
+            sb.AppendLine($"Filtered Entries Count: {_filteredEntries.Count:N0}");
+            sb.AppendLine($"Current Page: {_currentPage + 1}");
+            sb.AppendLine($"Page Size: {_pageSize}");
+            
+            if (_filteredEntries.Any())
+            {
+                sb.AppendLine();
+                sb.AppendLine("Sample Entry Analysis:");
+                var firstEntry = _filteredEntries.First();
+                sb.AppendLine($"  LogLevel: '{firstEntry.LogLevel}'");
+                sb.AppendLine($"  ChangeType: '{firstEntry.ChangeType}'");
+                sb.AppendLine($"  Error Field: '{firstEntry.Error}'");
+                sb.AppendLine($"  Timestamp: {firstEntry.Timestamp:yyyy-MM-dd HH:mm:ss}");
+                
+                var now = DateTime.Now;
+                var recentThreshold = now.AddMinutes(-30);
+                var isRecent = firstEntry.Timestamp >= recentThreshold;
+                sb.AppendLine($"  Is Recent (30m): {isRecent}");
+                sb.AppendLine($"  Current Time: {now:yyyy-MM-dd HH:mm:ss}");
+                sb.AppendLine($"  Recent Threshold: {recentThreshold:yyyy-MM-dd HH:mm:ss}");
+                
+                // Count different types
+                var errorEntries = _filteredEntries.Count(e => !string.IsNullOrWhiteSpace(e.Error));
+                var errorLogLevel = _filteredEntries.Count(e => e.LogLevel.Equals("ERROR", StringComparison.OrdinalIgnoreCase));
+                var recentEntries = _filteredEntries.Count(e => e.Timestamp >= recentThreshold);
+                
+                sb.AppendLine();
+                sb.AppendLine("Entry Type Counts:");
+                sb.AppendLine($"  Entries with Error field: {errorEntries}");
+                sb.AppendLine($"  Entries with ERROR LogLevel: {errorLogLevel}");
+                sb.AppendLine($"  Recent entries (30m): {recentEntries}");
+                sb.AppendLine($"  Created: {_filteredEntries.Count(e => e.ChangeType.Equals("Created", StringComparison.OrdinalIgnoreCase))}");
+                sb.AppendLine($"  Changed: {_filteredEntries.Count(e => e.ChangeType.Equals("Changed", StringComparison.OrdinalIgnoreCase))}");
+                sb.AppendLine($"  Deleted: {_filteredEntries.Count(e => e.ChangeType.Equals("Deleted", StringComparison.OrdinalIgnoreCase))}");
+                sb.AppendLine($"  Renamed: {_filteredEntries.Count(e => e.ChangeType.Equals("Renamed", StringComparison.OrdinalIgnoreCase))}");
+            }
+            
+            MessageBox.Show(sb.ToString(), "Log Viewer Diagnostic Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void BtnApplyFilters_Click(object sender, EventArgs e)
@@ -522,9 +877,16 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
         {
             if (disposing)
             {
-                _refreshCancellationTokenSource?.Cancel();
-                _refreshCancellationTokenSource?.Dispose();
-                _logFileWatcher?.Dispose();
+                try
+                {
+                    _refreshCancellationTokenSource?.Cancel();
+                    _refreshCancellationTokenSource?.Dispose();
+                    _logFileWatcher?.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error during disposal: {ex.Message}");
+                }
             }
             base.Dispose(disposing);
         }

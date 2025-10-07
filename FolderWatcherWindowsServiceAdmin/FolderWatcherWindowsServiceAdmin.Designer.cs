@@ -1,11 +1,11 @@
-﻿namespace FolderWatcherWindowsServiceAdmin
+namespace FolderWatcherWindowsServiceAdmin
 {
     partial class FolderWatcherWindowsServiceAdmin
     {
         /// <summary>
         /// Required designer variable.
         /// </summary>
-        private System.ComponentModel.IContainer components;
+        private System.ComponentModel.IContainer components = null;
 
         /// <summary>
         /// Clean up any resources being used.
@@ -30,6 +30,13 @@
         {
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPageService = new System.Windows.Forms.TabPage();
+            this.groupBoxFolders = new System.Windows.Forms.GroupBox();
+            this.listBoxFolders = new System.Windows.Forms.ListBox();
+            this.btnAddFolder = new System.Windows.Forms.Button();
+            this.btnRemoveFolder = new System.Windows.Forms.Button();
+            this.btnEditFolder = new System.Windows.Forms.Button();
+            this.lblConfigPath = new System.Windows.Forms.Label();
+            this.lblConfigPathValue = new System.Windows.Forms.Label();
             this.groupBoxService = new System.Windows.Forms.GroupBox();
             this.btnChangeStatus = new System.Windows.Forms.Button();
             this.btnUninstall = new System.Windows.Forms.Button();
@@ -38,6 +45,7 @@
             this.logViewerControl = new global::FolderWatcherWindowsServiceAdmin.Controls.LogViewerControl();
             this.tabControl1.SuspendLayout();
             this.tabPageService.SuspendLayout();
+            this.groupBoxFolders.SuspendLayout();
             this.groupBoxService.SuspendLayout();
             this.tabPageLogs.SuspendLayout();
             this.SuspendLayout();
@@ -55,6 +63,7 @@
             // 
             // tabPageService
             // 
+            this.tabPageService.Controls.Add(this.groupBoxFolders);
             this.tabPageService.Controls.Add(this.groupBoxService);
             this.tabPageService.Location = new System.Drawing.Point(4, 22);
             this.tabPageService.Name = "tabPageService";
@@ -63,6 +72,88 @@
             this.tabPageService.TabIndex = 0;
             this.tabPageService.Text = "Service Control";
             this.tabPageService.UseVisualStyleBackColor = true;
+            // 
+            // groupBoxFolders
+            // 
+            this.groupBoxFolders.Controls.Add(this.listBoxFolders);
+            this.groupBoxFolders.Controls.Add(this.btnAddFolder);
+            this.groupBoxFolders.Controls.Add(this.btnRemoveFolder);
+            this.groupBoxFolders.Controls.Add(this.btnEditFolder);
+            this.groupBoxFolders.Controls.Add(this.lblConfigPath);
+            this.groupBoxFolders.Controls.Add(this.lblConfigPathValue);
+            this.groupBoxFolders.Location = new System.Drawing.Point(9, 88);
+            this.groupBoxFolders.Margin = new System.Windows.Forms.Padding(2);
+            this.groupBoxFolders.Name = "groupBoxFolders";
+            this.groupBoxFolders.Padding = new System.Windows.Forms.Padding(2);
+            this.groupBoxFolders.Size = new System.Drawing.Size(1175, 578);
+            this.groupBoxFolders.TabIndex = 4;
+            this.groupBoxFolders.TabStop = false;
+            this.groupBoxFolders.Text = "Watched Folders Configuration";
+            // 
+            // listBoxFolders
+            // 
+            this.listBoxFolders.FormattingEnabled = true;
+            this.listBoxFolders.Location = new System.Drawing.Point(9, 45);
+            this.listBoxFolders.Margin = new System.Windows.Forms.Padding(2);
+            this.listBoxFolders.Name = "listBoxFolders";
+            this.listBoxFolders.SelectionMode = System.Windows.Forms.SelectionMode.One;
+            this.listBoxFolders.Size = new System.Drawing.Size(1158, 472);
+            this.listBoxFolders.TabIndex = 0;
+            this.listBoxFolders.SelectedIndexChanged += new System.EventHandler(this.listBoxFolders_SelectedIndexChanged);
+            // 
+            // btnAddFolder
+            // 
+            this.btnAddFolder.Location = new System.Drawing.Point(9, 522);
+            this.btnAddFolder.Margin = new System.Windows.Forms.Padding(2);
+            this.btnAddFolder.Name = "btnAddFolder";
+            this.btnAddFolder.Size = new System.Drawing.Size(100, 25);
+            this.btnAddFolder.TabIndex = 1;
+            this.btnAddFolder.Text = "Add Folder";
+            this.btnAddFolder.UseVisualStyleBackColor = true;
+            this.btnAddFolder.Click += new System.EventHandler(this.btnAddFolder_Click);
+            // 
+            // btnRemoveFolder
+            // 
+            this.btnRemoveFolder.Enabled = false;
+            this.btnRemoveFolder.Location = new System.Drawing.Point(114, 522);
+            this.btnRemoveFolder.Margin = new System.Windows.Forms.Padding(2);
+            this.btnRemoveFolder.Name = "btnRemoveFolder";
+            this.btnRemoveFolder.Size = new System.Drawing.Size(100, 25);
+            this.btnRemoveFolder.TabIndex = 2;
+            this.btnRemoveFolder.Text = "Remove Folder";
+            this.btnRemoveFolder.UseVisualStyleBackColor = true;
+            this.btnRemoveFolder.Click += new System.EventHandler(this.btnRemoveFolder_Click);
+            // 
+            // btnEditFolder
+            // 
+            this.btnEditFolder.Enabled = false;
+            this.btnEditFolder.Location = new System.Drawing.Point(219, 522);
+            this.btnEditFolder.Margin = new System.Windows.Forms.Padding(2);
+            this.btnEditFolder.Name = "btnEditFolder";
+            this.btnEditFolder.Size = new System.Drawing.Size(100, 25);
+            this.btnEditFolder.TabIndex = 3;
+            this.btnEditFolder.Text = "Edit Folder";
+            this.btnEditFolder.UseVisualStyleBackColor = true;
+            this.btnEditFolder.Click += new System.EventHandler(this.btnEditFolder_Click);
+            // 
+            // lblConfigPath
+            // 
+            this.lblConfigPath.AutoSize = true;
+            this.lblConfigPath.Location = new System.Drawing.Point(9, 18);
+            this.lblConfigPath.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.lblConfigPath.Name = "lblConfigPath";
+            this.lblConfigPath.Size = new System.Drawing.Size(94, 13);
+            this.lblConfigPath.TabIndex = 4;
+            this.lblConfigPath.Text = "Configuration File:";
+            // 
+            // lblConfigPathValue
+            // 
+            this.lblConfigPathValue.AutoSize = true;
+            this.lblConfigPathValue.Location = new System.Drawing.Point(107, 18);
+            this.lblConfigPathValue.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.lblConfigPathValue.Name = "lblConfigPathValue";
+            this.lblConfigPathValue.Size = new System.Drawing.Size(0, 13);
+            this.lblConfigPathValue.TabIndex = 5;
             // 
             // groupBoxService
             // 
@@ -144,6 +235,8 @@
             this.Load += new System.EventHandler(this.FolderWatcherWindowsServiceAdmin_Load);
             this.tabControl1.ResumeLayout(false);
             this.tabPageService.ResumeLayout(false);
+            this.groupBoxFolders.ResumeLayout(false);
+            this.groupBoxFolders.PerformLayout();
             this.groupBoxService.ResumeLayout(false);
             this.groupBoxService.PerformLayout();
             this.tabPageLogs.ResumeLayout(false);
@@ -160,7 +253,13 @@
         private System.Windows.Forms.Button btnChangeStatus;
         private System.Windows.Forms.Button btnUninstall;
         private System.Windows.Forms.Label lblStatus;
+        private System.Windows.Forms.GroupBox groupBoxFolders;
+        private System.Windows.Forms.ListBox listBoxFolders;
+        private System.Windows.Forms.Button btnAddFolder;
+        private System.Windows.Forms.Button btnRemoveFolder;
+        private System.Windows.Forms.Button btnEditFolder;
+        private System.Windows.Forms.Label lblConfigPath;
+        private System.Windows.Forms.Label lblConfigPathValue;
         private global::FolderWatcherWindowsServiceAdmin.Controls.LogViewerControl logViewerControl;
     }
 }
-

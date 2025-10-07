@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -38,12 +38,42 @@ namespace FolderWatcherWindowsServiceAdmin
         private volatile bool isUpdatingUI;
         private volatile bool isServiceOperationInProgress;
 
+        // folder management
+        private FolderManager folderManager;
+        private List<string> watchedFolders;
+
         public FolderWatcherWindowsServiceAdmin()
         {
             // create ServiceController instance for FolderWatcherWindowsService
             serviceController = new ServiceController(serviceName);
 
             InitializeComponent();
+            
+            // Initialize folder management
+            InitializeFolderManagement();
+        }
+
+        /// <summary>
+        /// Initialize folder management components
+        /// </summary>
+        private void InitializeFolderManagement()
+        {
+            try
+            {
+                folderManager = new FolderManager();
+                watchedFolders = new List<string>();
+                
+                // Display config file path
+                lblConfigPathValue.Text = folderManager.ConfigFilePath;
+                
+                // Load watched folders
+                RefreshFoldersList();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error initializing folder management: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         /// <summary>
@@ -58,6 +88,9 @@ namespace FolderWatcherWindowsServiceAdmin
 
             // Set the default tab to Service Control, but user can navigate to Log Viewer
             tabControl1.SelectedIndex = 0;
+            
+            // Refresh folders list to ensure it's up to date
+            RefreshFoldersList();
         }
 
         /// <summary>
@@ -84,7 +117,7 @@ namespace FolderWatcherWindowsServiceAdmin
         {
             try
             {
-                if (ServiceExists())
+                if (IsServiceInstalled(serviceName))
                 {
                     serviceController.Refresh();
                     lock (statusLock)
@@ -93,10 +126,23 @@ namespace FolderWatcherWindowsServiceAdmin
                         serviceControllerStatus = serviceController.Status;
                     }
                 }
+                else
+                {
+                    // Service doesn't exist, set default status
+                    lock (statusLock)
+                    {
+                        serviceControllerStatus = ServiceControllerStatus.Stopped;
+                    }
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error refreshing service status: {ex.Message}");
+                // Set default status on error
+                lock (statusLock)
+                {
+                    serviceControllerStatus = ServiceControllerStatus.Stopped;
+                }
             }
         }
 
@@ -150,6 +196,160 @@ namespace FolderWatcherWindowsServiceAdmin
         }
 
         /// <summary>
+        /// Check if a Windows service is installed on the system.
+        /// </summary>
+        /// <param name="serviceName">The name of the service to check</param>
+        /// <returns>True if service is installed, false otherwise</returns>
+        public static bool IsServiceInstalled(string serviceName)
+        {
+            try
+            {
+                using (ServiceController sc = new ServiceController(serviceName))
+                {
+                    // Check if the service exists by accessing its status
+                    ServiceControllerStatus status = sc.Status;
+                    return true;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // Service does not exist
+                return false;
+            }
+            catch (ArgumentException)
+            {
+                // Invalid service name or computer name
+                return false;
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                // Windows API error (service not found, access denied, etc.)
+                return false;
+            }
+            catch (Exception ex)
+            {
+                // Any other exception means we can't access the service
+                System.Diagnostics.Debug.WriteLine($"Unexpected error checking service existence: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Check if a Windows service is stopped.
+        /// </summary>
+        /// <param name="serviceName">The name of the service to check</param>
+        /// <returns>True if service is stopped, false if running or not installed</returns>
+        public static bool IsServiceStopped(string serviceName)
+        {
+            try
+            {
+                using (ServiceController sc = new ServiceController(serviceName))
+                {
+                    // Check if the service exists by accessing its status
+                    ServiceControllerStatus status = sc.Status;
+                    return status == ServiceControllerStatus.Stopped;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // Service does not exist
+                return false;
+            }
+            catch (ArgumentException)
+            {
+                // Invalid service name or computer name
+                return false;
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                // Windows API error (service not found, access denied, etc.)
+                return false;
+            }
+            catch (Exception ex)
+            {
+                // Any other exception means we can't access the service
+                System.Diagnostics.Debug.WriteLine($"Unexpected error checking service status: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Check if a Windows service is running.
+        /// </summary>
+        /// <param name="serviceName">The name of the service to check</param>
+        /// <returns>True if service is running, false if stopped or not installed</returns>
+        public static bool IsServiceRunning(string serviceName)
+        {
+            try
+            {
+                using (ServiceController sc = new ServiceController(serviceName))
+                {
+                    // Check if the service exists by accessing its status
+                    ServiceControllerStatus status = sc.Status;
+                    return status == ServiceControllerStatus.Running;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // Service does not exist
+                return false;
+            }
+            catch (ArgumentException)
+            {
+                // Invalid service name or computer name
+                return false;
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                // Windows API error (service not found, access denied, etc.)
+                return false;
+            }
+            catch (Exception ex)
+            {
+                // Any other exception means we can't access the service
+                System.Diagnostics.Debug.WriteLine($"Unexpected error checking service status: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Get the current status of a Windows service.
+        /// </summary>
+        /// <param name="serviceName">The name of the service to check</param>
+        /// <returns>Service status if accessible, null if service doesn't exist or can't be accessed</returns>
+        public static ServiceControllerStatus? GetServiceStatus(string serviceName)
+        {
+            try
+            {
+                using (ServiceController sc = new ServiceController(serviceName))
+                {
+                    return sc.Status;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // Service does not exist
+                return null;
+            }
+            catch (ArgumentException)
+            {
+                // Invalid service name or computer name
+                return null;
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                // Windows API error (service not found, access denied, etc.)
+                return null;
+            }
+            catch (Exception ex)
+            {
+                // Any other exception means we can't access the service
+                System.Diagnostics.Debug.WriteLine($"Unexpected error getting service status: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Check if user has permission to control services.
         /// </summary>
         /// <returns>True if user can control services, false otherwise</returns>
@@ -157,6 +357,12 @@ namespace FolderWatcherWindowsServiceAdmin
         {
             try
             {
+                // Only check permissions if service exists
+                if (!IsServiceInstalled(serviceName))
+                {
+                    return IsUserAdministrator(); // Can install if admin
+                }
+
                 // Try to access the service to check permissions
                 ServiceControllerStatus status = serviceController.Status;
 
@@ -168,8 +374,9 @@ namespace FolderWatcherWindowsServiceAdmin
 
                 return true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Permission check failed: {ex.Message}");
                 return false;
             }
         }
@@ -215,7 +422,7 @@ namespace FolderWatcherWindowsServiceAdmin
                 isUpdatingUI = true;
 
                 // get status
-                if (ServiceExists())
+                if (IsServiceInstalled(serviceName))
                 {
                     RefreshServiceStatus();
                     
@@ -341,23 +548,6 @@ namespace FolderWatcherWindowsServiceAdmin
         }
 
         /// <summary>
-        /// Check if the service exists.
-        /// </summary>
-        /// <returns>True if service exists, false otherwise</returns>
-        private bool ServiceExists()
-        {
-            try
-            {
-                ServiceControllerStatus status = serviceController.Status;
-                return true;
-            }
-            catch (InvalidOperationException)
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
         /// Get the service log file path.
         /// </summary>
         /// <returns>Full path to the service log file</returns>
@@ -461,10 +651,21 @@ namespace FolderWatcherWindowsServiceAdmin
             try
             {
                 // Stop service if running
-                if (ServiceExists() && serviceController.Status == ServiceControllerStatus.Running)
+                if (IsServiceInstalled(serviceName))
                 {
-                    serviceController.Stop();
-                    serviceController.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
+                    try
+                    {
+                        if (serviceController.Status == ServiceControllerStatus.Running)
+                        {
+                            serviceController.Stop();
+                            serviceController.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error stopping service before uninstall: {ex.Message}");
+                        // Continue with uninstall even if stop fails
+                    }
                 }
 
                 ProcessStartInfo startInfo = new ProcessStartInfo
@@ -526,7 +727,7 @@ namespace FolderWatcherWindowsServiceAdmin
                     return;
                 }
 
-                if (!ServiceExists())
+                if (!IsServiceInstalled(serviceName))
                 {
                     // Install the service
                     isServiceOperationInProgress = true;
@@ -650,7 +851,7 @@ namespace FolderWatcherWindowsServiceAdmin
                 return;
             }
 
-            if (!ServiceExists())
+            if (!IsServiceInstalled(serviceName))
             {
                 MessageBox.Show($"Service '{serviceName}' is not installed.", "Service Not Found", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -670,6 +871,554 @@ namespace FolderWatcherWindowsServiceAdmin
         }
 
         /// <summary>
+        /// Add new folder to watch list with enhanced conflict detection
+        /// </summary>
+        private void btnAddFolder_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+                {
+                    dialog.Description = "Select folder to watch for file system changes";
+                    dialog.ShowNewFolderButton = false;
+
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        string selectedPath = dialog.SelectedPath;
+
+                        // Debug: Log the selected path and current watched folders
+                        System.Diagnostics.Debug.WriteLine($"Adding folder: '{selectedPath}'");
+                        System.Diagnostics.Debug.WriteLine($"Current watched folders: {string.Join(", ", watchedFolders)}");
+
+                        // Validate the folder
+                        if (!folderManager.ValidateFolder(selectedPath))
+                        {
+                            MessageBox.Show("The selected folder does not exist or is not accessible.",
+                                "Invalid Folder", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+
+                        // Check if folder is already being watched
+                        if (watchedFolders.Contains(selectedPath, StringComparer.OrdinalIgnoreCase))
+                        {
+                            MessageBox.Show("This folder is already being watched.",
+                                "Duplicate Folder", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+
+                        // Enhanced check for parent-child relationships
+                        var conflictResult = CheckForFolderConflicts(selectedPath);
+                        System.Diagnostics.Debug.WriteLine($"Conflict check result: CanAdd={conflictResult.CanAdd}, FoldersToRemove={conflictResult.FoldersToRemove.Count}");
+                        
+                        if (!conflictResult.CanAdd)
+                        {
+                            return; // User chose not to proceed
+                        }
+
+                        // Remove any folders that the user chose to replace
+                        foreach (string folderToRemove in conflictResult.FoldersToRemove)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Removing conflicting folder: '{folderToRemove}'");
+                            watchedFolders.Remove(folderToRemove);
+                        }
+
+                        // Add the folder
+                        watchedFolders.Add(selectedPath);
+                        SaveFoldersConfiguration();
+                        UpdateFoldersListBox();
+
+                        string message = $"Folder '{selectedPath}' has been added to the watch list.";
+                        if (conflictResult.FoldersToRemove.Count > 0)
+                        {
+                            message += $"\n\nRemoved {conflictResult.FoldersToRemove.Count} overlapping folder(s).";
+                        }
+                        message += "\n\nNote: You may need to restart the service for changes to take effect.";
+
+                        MessageBox.Show(message, "Folder Added", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error adding folder: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Remove selected folder from watch list
+        /// </summary>
+        private void btnRemoveFolder_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (listBoxFolders.SelectedIndex < 0)
+                {
+                    MessageBox.Show("Please select a folder to remove.", "No Selection",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                int selectedIndex = listBoxFolders.SelectedIndex;
+                string selectedFolder = watchedFolders[selectedIndex]; // Use actual path, not display text
+
+                DialogResult result = MessageBox.Show(
+                    $"Are you sure you want to remove '{selectedFolder}' from the watch list?",
+                    "Confirm Removal", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
+                {
+                    watchedFolders.RemoveAt(selectedIndex);
+                    SaveFoldersConfiguration();
+                    UpdateFoldersListBox();
+
+                    MessageBox.Show($"Folder '{selectedFolder}' has been removed from the watch list.\n\n" +
+                        "Note: You may need to restart the service for changes to take effect.",
+                        "Folder Removed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error removing folder: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Edit selected folder path
+        /// </summary>
+        private void btnEditFolder_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (listBoxFolders.SelectedIndex < 0)
+                {
+                    MessageBox.Show("Please select a folder to edit.", "No Selection",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                int selectedIndex = listBoxFolders.SelectedIndex;
+                string currentFolder = watchedFolders[selectedIndex]; // Use actual path, not display text
+
+                using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+                {
+                    dialog.Description = "Select new folder path";
+                    dialog.SelectedPath = currentFolder;
+                    dialog.ShowNewFolderButton = false;
+
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        string newPath = dialog.SelectedPath;
+
+                        // Don't validate if path hasn't changed
+                        if (string.Equals(currentFolder, newPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            MessageBox.Show("The folder path is unchanged.", "No Changes",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+
+                        // Validate the folder
+                        if (!folderManager.ValidateFolder(newPath))
+                        {
+                            MessageBox.Show("The selected folder does not exist or is not accessible.",
+                                "Invalid Folder", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+
+                        // Check if folder is already being watched (excluding current item)
+                        if (watchedFolders.Where((f, i) => i != selectedIndex)
+                            .Contains(newPath, StringComparer.OrdinalIgnoreCase))
+                        {
+                            MessageBox.Show("This folder is already being watched.",
+                                "Duplicate Folder", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+
+                        // Temporarily set new path for conflict checking
+                        string originalFolder = watchedFolders[selectedIndex];
+                        watchedFolders[selectedIndex] = newPath;
+
+                        // Check for conflicts with the new path
+                        var conflictResult = CheckForEditConflicts(newPath, selectedIndex);
+                        
+                        if (!conflictResult.CanEdit)
+                        {
+                            // Restore original folder if user cancelled
+                            watchedFolders[selectedIndex] = originalFolder;
+                            return;
+                        }
+
+                        // Remove any folders that conflict
+                        foreach (string folderToRemove in conflictResult.FoldersToRemove)
+                        {
+                            int indexToRemove = watchedFolders.IndexOf(folderToRemove);
+                            if (indexToRemove >= 0 && indexToRemove != selectedIndex)
+                            {
+                                watchedFolders.RemoveAt(indexToRemove);
+                                // Adjust selected index if necessary
+                                if (indexToRemove < selectedIndex)
+                                {
+                                    selectedIndex--;
+                                }
+                            }
+                        }
+
+                        // Save configuration and update UI
+                        SaveFoldersConfiguration();
+                        UpdateFoldersListBox();
+
+                        // Restore selection
+                        if (selectedIndex < listBoxFolders.Items.Count)
+                        {
+                            listBoxFolders.SelectedIndex = selectedIndex;
+                        }
+
+                        string message = $"Folder path has been updated to '{newPath}'.";
+                        if (conflictResult.FoldersToRemove.Count > 0)
+                        {
+                            message += $"\n\nRemoved {conflictResult.FoldersToRemove.Count} overlapping folder(s).";
+                        }
+                        message += "\n\nNote: You may need to restart the service for changes to take effect.";
+
+                        MessageBox.Show(message, "Folder Updated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error editing folder: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Handle folder selection change
+        /// </summary>
+        private void listBoxFolders_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            bool hasSelection = listBoxFolders.SelectedIndex >= 0;
+            btnRemoveFolder.Enabled = hasSelection;
+            btnEditFolder.Enabled = hasSelection;
+        }
+
+        /// <summary>
+        /// Check for folder conflicts and handle user decisions
+        /// </summary>
+        /// <param name="newFolderPath">The new folder path to check</param>
+        /// <returns>Result indicating if the folder can be added and which folders to remove</returns>
+        private FolderConflictResult CheckForFolderConflicts(string newFolderPath)
+        {
+            var result = new FolderConflictResult { CanAdd = true, FoldersToRemove = new List<string>() };
+            
+            var parentFolders = new List<string>();
+            var childFolders = new List<string>();
+
+            System.Diagnostics.Debug.WriteLine($"Checking conflicts for: '{newFolderPath}'");
+
+            // Categorize existing folders in relation to the new folder
+            foreach (string existingFolder in watchedFolders)
+            {
+                System.Diagnostics.Debug.WriteLine($"  Checking against existing: '{existingFolder}'");
+                
+                // Check if newFolderPath is a child of existingFolder
+                bool isNewFolderChild = FolderManager.IsSubfolder(existingFolder, newFolderPath);
+                System.Diagnostics.Debug.WriteLine($"    Is '{newFolderPath}' child of '{existingFolder}': {isNewFolderChild}");
+                
+                // Check if existingFolder is a child of newFolderPath  
+                bool isExistingChild = FolderManager.IsSubfolder(newFolderPath, existingFolder);
+                System.Diagnostics.Debug.WriteLine($"    Is '{existingFolder}' child of '{newFolderPath}': {isExistingChild}");
+
+                if (isNewFolderChild)
+                {
+                    // New folder is a child of existing folder
+                    parentFolders.Add(existingFolder);
+                    System.Diagnostics.Debug.WriteLine($"    Added '{existingFolder}' as parent folder");
+                }
+                else if (isExistingChild)
+                {
+                    // New folder is a parent of existing folder
+                    childFolders.Add(existingFolder);
+                    System.Diagnostics.Debug.WriteLine($"    Added '{existingFolder}' as child folder");
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine($"Found {parentFolders.Count} parent folders, {childFolders.Count} child folders");
+
+            // Handle case where new folder has parent folders being watched
+            if (parentFolders.Count > 0)
+            {
+                string parentList = string.Join("\n• ", parentFolders);
+                string message;
+                
+                if (IsDriveRootScenario(parentFolders, newFolderPath))
+                {
+                    message = $"WARNING: Drive-level monitoring detected!\n\n" +
+                             $"The selected folder:\n'{newFolderPath}'\n\n" +
+                             $"is located on a drive that is already being monitored:\n• {parentList}\n\n" +
+                             $"This will cause DUPLICATE LOGGING for all files in '{newFolderPath}'.\n\n" +
+                             $"Monitoring an entire drive is very resource-intensive and may impact system performance.\n\n" +
+                             $"Recommendation: Remove drive monitoring and monitor specific folders instead.\n\n" +
+                             $"Do you want to continue anyway?";
+                }
+                else
+                {
+                    message = $"The selected folder:\n'{newFolderPath}'\n\n" +
+                             $"is a subfolder of these already monitored folders:\n• {parentList}\n\n" +
+                             $"This will cause duplicate logging for files in the selected folder.\n\n" +
+                             $"Do you want to continue anyway?";
+                }
+
+                DialogResult dialogResult = MessageBox.Show(message, "Folder Overlap Warning", 
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+                if (dialogResult == DialogResult.No)
+                {
+                    result.CanAdd = false;
+                    return result;
+                }
+            }
+
+            // Handle case where new folder would be parent of existing folders
+            if (childFolders.Count > 0)
+            {
+                string childList = string.Join("\n• ", childFolders);
+                string message;
+
+                if (IsDriveRootScenario(new List<string> { newFolderPath }, childFolders.ToArray()))
+                {
+                    message = $"WARNING: You are about to monitor an entire drive!\n\n" +
+                             $"The selected folder:\n'{newFolderPath}'\n\n" +
+                             $"is a drive root that contains these currently monitored folders:\n• {childList}\n\n" +
+                             $"Drive-level monitoring is very resource-intensive and may impact system performance.\n\n" +
+                             $"Options:\n" +
+                             $"• YES: Monitor entire drive (will remove specific folder monitoring)\n" +
+                             $"• NO: Keep monitoring specific folders only\n\n" +
+                             $"Do you want to monitor the entire drive?";
+                }
+                else
+                {
+                    message = $"The selected folder:\n'{newFolderPath}'\n\n" +
+                             $"is a parent folder of these currently monitored folders:\n• {childList}\n\n" +
+                             $"Do you want to:\n" +
+                             $"• YES: Remove the specific folders and monitor the parent folder\n" +
+                             $"• NO: Keep the current specific folder monitoring";
+                }
+
+                DialogResult dialogResult = MessageBox.Show(message, "Parent Folder Selection", 
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                if (dialogResult == DialogResult.Yes)
+                {
+                    result.FoldersToRemove.AddRange(childFolders);
+                }
+                else
+                {
+                    result.CanAdd = false;
+                    return result;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Check for conflicts when editing a folder path
+        /// </summary>
+        /// <param name="newFolderPath">The new folder path</param>
+        /// <param name="excludeIndex">Index to exclude from conflict checking</param>
+        /// <returns>Result indicating if the edit can proceed</returns>
+        private FolderConflictResult CheckForEditConflicts(string newFolderPath, int excludeIndex)
+        {
+            var result = new FolderConflictResult { CanAdd = true, FoldersToRemove = new List<string>() };
+            
+            var parentFolders = new List<string>();
+            var childFolders = new List<string>();
+
+            // Check against all other folders (excluding the one being edited)
+            for (int i = 0; i < watchedFolders.Count; i++)
+            {
+                if (i == excludeIndex) continue;
+
+                string existingFolder = watchedFolders[i];
+                
+                if (FolderManager.IsSubfolder(existingFolder, newFolderPath))
+                {
+                    parentFolders.Add(existingFolder);
+                }
+                else if (FolderManager.IsSubfolder(newFolderPath, existingFolder))
+                {
+                    childFolders.Add(existingFolder);
+                }
+            }
+
+            // Handle parent folder conflicts
+            if (parentFolders.Count > 0)
+            {
+                string parentList = string.Join("\n• ", parentFolders);
+                string message;
+                
+                if (IsDriveRootScenario(parentFolders, newFolderPath))
+                {
+                    message = $"WARNING: Drive-level monitoring detected!\n\n" +
+                             $"The new folder path:\n'{newFolderPath}'\n\n" +
+                             $"is located on a drive that is already being monitored:\n• {parentList}\n\n" +
+                             $"This will cause DUPLICATE LOGGING for all files in '{newFolderPath}'.\n\n" +
+                             $"Do you want to continue with this change?";
+                }
+                else
+                {
+                    message = $"The new folder path:\n'{newFolderPath}'\n\n" +
+                             $"is a subfolder of these monitored folders:\n• {parentList}\n\n" +
+                             $"This will cause duplicate logging. Do you want to continue?";
+                }
+
+                if (MessageBox.Show(message, "Folder Overlap Warning", 
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.No)
+                {
+                    result.CanAdd = false;
+                    return result;
+                }
+            }
+
+            // Handle child folder conflicts
+            if (childFolders.Count > 0)
+            {
+                string childList = string.Join("\n• ", childFolders);
+                string message;
+
+                if (IsDriveRootScenario(new List<string> { newFolderPath }, childFolders.ToArray()))
+                {
+                    message = $"WARNING: You are changing to monitor an entire drive!\n\n" +
+                             $"The new folder path:\n'{newFolderPath}'\n\n" +
+                             $"contains these currently monitored folders:\n• {childList}\n\n" +
+                             $"Do you want to remove the specific folders and monitor the entire drive?";
+                }
+                else
+                {
+                    message = $"The new folder path:\n'{newFolderPath}'\n\n" +
+                             $"is a parent of these monitored folders:\n• {childList}\n\n" +
+                             $"Do you want to remove them and monitor the parent folder instead?";
+                }
+
+                if (MessageBox.Show(message, "Parent Folder Selection", 
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    result.FoldersToRemove.AddRange(childFolders);
+                }
+                else
+                {
+                    result.CanAdd = false;
+                    return result;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Determine if this is a drive root scenario (high impact)
+        /// </summary>
+        private bool IsDriveRootScenario(List<string> parentPaths, params string[] childPaths)
+        {
+            // Check if any parent is a drive root
+            foreach (string parent in parentPaths)
+            {
+                if (IsDriveRoot(parent))
+                    return true;
+            }
+
+            // Check if the new path being added is a drive root
+            foreach (string child in childPaths)
+            {
+                if (IsDriveRoot(child))
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Check if a path is a drive root (e.g., C:\, D:\)
+        /// </summary>
+        private bool IsDriveRoot(string path)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(path))
+                    return false;
+
+                string normalizedPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
+                return normalizedPath.Length == 2 && normalizedPath.EndsWith(":");
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Save the folders configuration to file
+        /// </summary>
+        private void SaveFoldersConfiguration()
+        {
+            try
+            {
+                folderManager.SaveWatchedFolders(watchedFolders);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error saving configuration: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                throw; // Re-throw to prevent UI from being out of sync
+            }
+        }
+
+        /// <summary>
+        /// Refresh the folders list from configuration
+        /// </summary>
+        private void RefreshFoldersList()
+        {
+            try
+            {
+                watchedFolders = folderManager.GetWatchedFolders();
+                UpdateFoldersListBox();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading watched folders: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        /// <summary>
+        /// Update the folders list box display
+        /// </summary>
+        private void UpdateFoldersListBox()
+        {
+            listBoxFolders.Items.Clear();
+            
+            foreach (string folder in watchedFolders)
+            {
+                string displayText = folder;
+                
+                // Add warning indicator for drive roots
+                if (IsDriveRoot(folder))
+                {
+                    displayText += " ? [DRIVE ROOT - HIGH RESOURCE USAGE]";
+                }
+                
+                listBoxFolders.Items.Add(displayText);
+            }
+            
+            // Update button states
+            bool hasSelection = listBoxFolders.SelectedIndex >= 0;
+            btnRemoveFolder.Enabled = hasSelection;
+            btnEditFolder.Enabled = hasSelection;
+        }
+
+        /// <summary>
         /// Monitor service status with improved error handling and recovery
         /// </summary>
         private async Task MonitorServiceStatusAsync(CancellationToken cancellationToken)
@@ -681,7 +1430,7 @@ namespace FolderWatcherWindowsServiceAdmin
             {
                 try
                 {
-                    if (ServiceExists())
+                    if (IsServiceInstalled(serviceName))
                     {
                         serviceController.Refresh();
                         ServiceControllerStatus currentStatus = serviceController.Status;
@@ -732,6 +1481,7 @@ namespace FolderWatcherWindowsServiceAdmin
                     else
                     {
                         // Service doesn't exist, stop monitoring
+                        System.Diagnostics.Debug.WriteLine("Service doesn't exist, stopping monitoring");
                         break;
                     }
                     
@@ -795,7 +1545,28 @@ namespace FolderWatcherWindowsServiceAdmin
 
         private void logViewerControl_Load(object sender, EventArgs e)
         {
+            // Ensure the log viewer loads data when the tab is first accessed
+            if (logViewerControl != null)
+            {
+                // Force a refresh of the log data to ensure existing entries are displayed
+                logViewerControl.RefreshData();
+            }
+        }
 
+        /// <summary>
+        /// Result of folder conflict checking
+        /// </summary>
+        private class FolderConflictResult
+        {
+            public bool CanAdd { get; set; }
+            public List<string> FoldersToRemove { get; set; } = new List<string>();
+            
+            // Alias property for edit operations
+            public bool CanEdit 
+            { 
+                get { return CanAdd; } 
+                set { CanAdd = value; } 
+            }
         }
     }
 }

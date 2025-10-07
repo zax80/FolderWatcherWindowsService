@@ -1,15 +1,8 @@
 ﻿using log4net;
-using log4net.Appender;
 using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
+using System.Configuration;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Security.AccessControl;
-using System.Security.Principal;
 using System.ServiceProcess;
-using System.Threading;
 
 namespace FolderWatcherWindowsService
 {
@@ -38,6 +31,8 @@ namespace FolderWatcherWindowsService
             {
                 LogServiceEvent("Folder Watcher Windows Service is starting.", EventLogEntryType.Information);
                 _logger?.Info("Service starting - initializing folder watchers");
+
+                ConfigurationManager.RefreshSection("appSettings");
 
                 _csvLogger.WriteHeader();
                 _watcherManager.StartWatching(Properties.Settings.Default.FolderPaths);
