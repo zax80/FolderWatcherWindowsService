@@ -1,6 +1,7 @@
-﻿using FolderWatcherWindowsService.Models;
+﻿using FolderWatcherWindowsService.Common.Models;
 using System;
 using System.IO;
+using System.Security.AccessControl;
 using System.Security.Principal;
 
 /// <summary>

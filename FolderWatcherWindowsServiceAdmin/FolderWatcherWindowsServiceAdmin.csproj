@@ -48,6 +48,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AlertConfigForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="AlertConfigForm.Designer.cs" />
     <Compile Include="Controls\LogViewerControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -78,8 +82,6 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <None Include="ClassDiagram1.cd" />
-    <None Include="PERFORMANCE_OPTIMIZATIONS.md" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -94,7 +96,14 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="ServiceLog.txt" />
+    <ProjectReference Include="..\FolderWatcherWindowsService.Common\FolderWatcherWindowsService.Common.csproj">
+      <Project>{a1b2c3d4-e5f6-4789-a012-3456789abcde}</Project>
+      <Name>FolderWatcherWindowsService.Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\FolderWatcherWindowsService.ThreatDetection\FolderWatcherWindowsService.ThreatDetection.csproj">
+      <Project>{f7e8d9a0-b1c2-4d3e-a5f6-7890abcdef12}</Project>
+      <Name>FolderWatcherWindowsService.ThreatDetection</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

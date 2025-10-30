@@ -1,4 +1,8 @@
-﻿using FolderWatcherWindowsService.Models;
+using FolderWatcherWindowsService.Common.Interfaces;
+using FolderWatcherWindowsService.Common.Models;
+#if PREMIUM
+using FolderWatcherWindowsService.ThreatDetection.Services;
+#endif
 using log4net;
 using log4net.Appender;
 using System;
@@ -6,15 +10,18 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
+using System.Timers;
 
-/// <summary>
-/// Manages multiple FileSystemWatcher instances and coordinates file system monitoring.
-/// </summary>
 namespace FolderWatcherWindowsService
 {
+    /// <summary>
+    /// Manages multiple FileSystemWatcher instances and coordinates file system monitoring.
+    /// SOLID: Single Responsibility - only manages file watching, delegates threat detection.
+    /// </summary>
     internal class WatcherManager
     {
         private const int DebounceDelayMs = 500;
+        private const int CleanupIntervalMinutes = 30;
 
         private readonly ILog _logger;
         private readonly CsvLogger _csvLogger;
@@ -23,6 +30,10 @@ namespace FolderWatcherWindowsService
         private readonly FileInfoProvider _fileInfoProvider;
         private string _logFilePath;
 
+        // Threat detection via interface
+        private readonly IThreatDetectionService _threatDetectionService;
+        private Timer _cleanupTimer;
+
         public WatcherManager(ILog logger, CsvLogger csvLogger)
         {
             _logger = logger;
@@ -30,6 +41,21 @@ namespace FolderWatcherWindowsService
             _watchers = new List<FileSystemWatcher>();
             _debouncer = new EventDebouncer(DebounceDelayMs);
             _fileInfoProvider = new FileInfoProvider();
+
+            // Initialize threat detection based on build configuration
+#if PREMIUM
+            _threatDetectionService = new ThreatDetectionService(logger);
+            _threatDetectionService.Initialize();
+            _logger?.Info("WatcherManager initialized with PREMIUM threat detection");
+#else
+            _threatDetectionService = new Services.NullThreatDetectionService();
+            _logger?.Info("WatcherManager initialized in FREE mode (no threat detection)");
+#endif
+
+            // Setup periodic cleanup
+            _cleanupTimer = new Timer(CleanupIntervalMinutes * 60 * 1000);
+            _cleanupTimer.Elapsed += OnCleanupTimer;
+            _cleanupTimer.Start();
         }
 
         public void StartWatching(StringCollection folderPaths)
@@ -52,12 +78,18 @@ namespace FolderWatcherWindowsService
 
         public void StopWatching()
         {
+            _cleanupTimer?.Stop();
+            _cleanupTimer?.Dispose();
+
             foreach (var watcher in _watchers)
             {
                 DisposeWatcher(watcher);
             }
             _watchers.Clear();
             _debouncer.Dispose();
+
+            // Cleanup threat detection
+            _threatDetectionService?.Cleanup();
         }
 
         private void CreateWatcher(string path)
@@ -81,9 +113,9 @@ namespace FolderWatcherWindowsService
                     EnableRaisingEvents = true,
                     IncludeSubdirectories = true,
                     NotifyFilter = NotifyFilters.FileName |
-                                 NotifyFilters.DirectoryName |
-                                 NotifyFilters.LastWrite |
-                                 NotifyFilters.Size
+                          NotifyFilters.DirectoryName |
+                 NotifyFilters.LastWrite |
+                 NotifyFilters.Size
                 };
 
                 watcher.Created += OnFileSystemEvent;
@@ -128,11 +160,32 @@ namespace FolderWatcherWindowsService
             {
                 var logEntry = CreateLogEntry(e);
                 _csvLogger.LogEntry(logEntry);
+
+                // Perform threat analysis via interface
+                _ = _threatDetectionService.AnalyzeAsync(logEntry);
             }
             catch (Exception ex)
             {
                 var errorEntry = CreateErrorLogEntry(e, ex);
                 _csvLogger.LogError(errorEntry);
+            }
+        }
+
+        /// <summary>
+        /// Periodic cleanup of old tracking data.
+        /// </summary>
+        private void OnCleanupTimer(object sender, ElapsedEventArgs e)
+        {
+            try
+            {
+                // ThreatDetectionService handles its own config reload during cleanup
+                _threatDetectionService?.Cleanup();
+
+                _logger?.Debug("Periodic cleanup completed");
+            }
+            catch (Exception ex)
+            {
+                _logger?.Error($"Error during cleanup: {ex.Message}", ex);
             }
         }
 
@@ -171,7 +224,7 @@ namespace FolderWatcherWindowsService
         private bool IsLogFile(string filePath)
         {
             return !string.IsNullOrEmpty(_logFilePath) &&
-                   string.Equals(filePath, _logFilePath, StringComparison.OrdinalIgnoreCase);
+             string.Equals(filePath, _logFilePath, StringComparison.OrdinalIgnoreCase);
         }
 
         private void RecoverWatcher(FileSystemWatcher faultyWatcher)
@@ -216,9 +269,9 @@ namespace FolderWatcherWindowsService
             try
             {
                 return LogManager.GetRepository()
-                    .GetAppenders()
-                    .OfType<FileAppender>()
-                    .FirstOrDefault()?.File;
+                      .GetAppenders()
+                 .OfType<FileAppender>()
+                 .FirstOrDefault()?.File;
             }
             catch (Exception ex)
             {

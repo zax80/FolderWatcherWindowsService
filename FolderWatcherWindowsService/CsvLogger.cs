@@ -1,7 +1,9 @@
-﻿using FolderWatcherWindowsService.Models;
+﻿using FolderWatcherWindowsService.Common.Models;
 using log4net;
 using System;
 using System.Diagnostics;
+using System.IO;
+using System.Text;
 
 namespace FolderWatcherWindowsService
 {

@@ -40,6 +40,7 @@ namespace FolderWatcherWindowsServiceAdmin
             this.groupBoxService = new System.Windows.Forms.GroupBox();
             this.btnChangeStatus = new System.Windows.Forms.Button();
             this.btnUninstall = new System.Windows.Forms.Button();
+            this.btnAlertConfig = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
             this.tabPageLogs = new System.Windows.Forms.TabPage();
             this.logViewerControl = new global::FolderWatcherWindowsServiceAdmin.Controls.LogViewerControl();
@@ -159,6 +160,7 @@ namespace FolderWatcherWindowsServiceAdmin
             // 
             this.groupBoxService.Controls.Add(this.btnChangeStatus);
             this.groupBoxService.Controls.Add(this.btnUninstall);
+            this.groupBoxService.Controls.Add(this.btnAlertConfig);
             this.groupBoxService.Controls.Add(this.lblStatus);
             this.groupBoxService.Location = new System.Drawing.Point(9, 10);
             this.groupBoxService.Margin = new System.Windows.Forms.Padding(2);
@@ -190,6 +192,17 @@ namespace FolderWatcherWindowsServiceAdmin
             this.btnUninstall.Text = "Uninstall";
             this.btnUninstall.UseVisualStyleBackColor = true;
             this.btnUninstall.Click += new System.EventHandler(this.BtnUninstall_Click);
+            // 
+            // btnAlertConfig
+            // 
+            this.btnAlertConfig.Location = new System.Drawing.Point(89, 41);
+            this.btnAlertConfig.Margin = new System.Windows.Forms.Padding(2);
+            this.btnAlertConfig.Name = "btnAlertConfig";
+            this.btnAlertConfig.Size = new System.Drawing.Size(100, 19);
+            this.btnAlertConfig.TabIndex = 3;
+            this.btnAlertConfig.Text = "Alert Settings...";
+            this.btnAlertConfig.UseVisualStyleBackColor = true;
+            this.btnAlertConfig.Click += new System.EventHandler(this.btnAlertConfig_Click);
             // 
             // lblStatus
             // 
@@ -252,6 +265,7 @@ namespace FolderWatcherWindowsServiceAdmin
         private System.Windows.Forms.GroupBox groupBoxService;
         private System.Windows.Forms.Button btnChangeStatus;
         private System.Windows.Forms.Button btnUninstall;
+        private System.Windows.Forms.Button btnAlertConfig;
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.GroupBox groupBoxFolders;
         private System.Windows.Forms.ListBox listBoxFolders;

@@ -75,9 +75,6 @@
     <Compile Include="FolderWatcherWindowsService.Designer.cs">
       <DependentUpon>FolderWatcherWindowsService.cs</DependentUpon>
     </Compile>
-    <Compile Include="Models\FileInfoData.cs" />
-    <Compile Include="Models\FileSystemLogEntry.cs" />
-    <Compile Include="Models\UserInfoData.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="ProjectInstaller.cs">
       <SubType>Component</SubType>
@@ -91,11 +88,11 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
+    <Compile Include="Services\NullThreatDetectionService.cs" />
     <Compile Include="WatcherManager.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="ClassDiagram1.cd" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
@@ -123,6 +120,17 @@
       <Install>false</Install>
     </BootstrapperPackage>
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FolderWatcherWindowsService.Common\FolderWatcherWindowsService.Common.csproj">
+      <Project>{a1b2c3d4-e5f6-4789-a012-3456789abcde}</Project>
+      <Name>FolderWatcherWindowsService.Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\FolderWatcherWindowsService.ThreatDetection\FolderWatcherWindowsService.ThreatDetection.csproj">
+      <Project>{f7e8d9a0-b1c2-4d3e-a5f6-7890abcdef12}</Project>
+      <Name>FolderWatcherWindowsService.ThreatDetection</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>xcopy /E /Y /I "$(TargetDir)*" "$(SolutionDir)FolderWatcherWindowsServiceAdmin\bin\$(Configuration)\"</PostBuildEvent>

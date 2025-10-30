@@ -871,6 +871,35 @@ namespace FolderWatcherWindowsServiceAdmin
         }
 
         /// <summary>
+        /// Open the Alert Configuration dialog.
+        /// </summary>
+        private void btnAlertConfig_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (var alertConfigForm = new AlertConfigForm())
+                {
+                    var result = alertConfigForm.ShowDialog(this);
+        
+                    if (result == DialogResult.OK)
+                    {
+                        MessageBox.Show(
+                            "Alert configuration saved successfully.\n\n" +
+                            "Note: If the service is currently running, you may need to restart it for the new settings to take effect.",
+                            "Configuration Saved",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening alert configuration: {ex.Message}",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
         /// Add new folder to watch list with enhanced conflict detection
         /// </summary>
         private void btnAddFolder_Click(object sender, EventArgs e)
