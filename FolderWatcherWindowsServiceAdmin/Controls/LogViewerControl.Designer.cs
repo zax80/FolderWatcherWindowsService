@@ -347,9 +347,9 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             // 
             this.panelMain.Controls.Add(this.dataGridViewLogs);
             this.panelMain.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panelMain.Location = new System.Drawing.Point(0, 140);
+            this.panelMain.Location = new System.Drawing.Point(0, 0);
             this.panelMain.Name = "panelMain";
-            this.panelMain.Size = new System.Drawing.Size(1200, 460);
+            this.panelMain.Size = new System.Drawing.Size(1200, 600);
             this.panelMain.TabIndex = 1;
             // 
             // dataGridViewLogs
@@ -361,7 +361,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.dataGridViewLogs.Location = new System.Drawing.Point(0, 0);
             this.dataGridViewLogs.Name = "dataGridViewLogs";
             this.dataGridViewLogs.ReadOnly = true;
-            this.dataGridViewLogs.Size = new System.Drawing.Size(1200, 460);
+            this.dataGridViewLogs.Size = new System.Drawing.Size(1200, 600);
             this.dataGridViewLogs.TabIndex = 0;
             // 
             // panelBottom
@@ -409,7 +409,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             // 
             // btnRefresh
             // 
-            this.btnRefresh.Location = new System.Drawing.Point(10, 15);
+            this.btnRefresh.Location = new System.Drawing.Point(129, 5);
             this.btnRefresh.Name = "btnRefresh";
             this.btnRefresh.Size = new System.Drawing.Size(75, 23);
             this.btnRefresh.TabIndex = 5;
@@ -419,7 +419,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             // 
             // btnNextPage
             // 
-            this.btnNextPage.Location = new System.Drawing.Point(620, 15);
+            this.btnNextPage.Location = new System.Drawing.Point(619, 5);
             this.btnNextPage.Name = "btnNextPage";
             this.btnNextPage.Size = new System.Drawing.Size(75, 23);
             this.btnNextPage.TabIndex = 4;
@@ -429,7 +429,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             // 
             // btnPrevPage
             // 
-            this.btnPrevPage.Location = new System.Drawing.Point(539, 15);
+            this.btnPrevPage.Location = new System.Drawing.Point(539, 5);
             this.btnPrevPage.Name = "btnPrevPage";
             this.btnPrevPage.Size = new System.Drawing.Size(75, 23);
             this.btnPrevPage.TabIndex = 3;
@@ -440,7 +440,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             // lblPageInfo
             // 
             this.lblPageInfo.AutoSize = true;
-            this.lblPageInfo.Location = new System.Drawing.Point(350, 20);
+            this.lblPageInfo.Location = new System.Drawing.Point(350, 10);
             this.lblPageInfo.Name = "lblPageInfo";
             this.lblPageInfo.Size = new System.Drawing.Size(77, 13);
             this.lblPageInfo.TabIndex = 2;
@@ -449,7 +449,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             // label5
             // 
             this.label5.AutoSize = true;
-            this.label5.Location = new System.Drawing.Point(210, 20);
+            this.label5.Location = new System.Drawing.Point(210, 10);
             this.label5.Name = "label5";
             this.label5.Size = new System.Drawing.Size(58, 13);
             this.label5.TabIndex = 1;
@@ -459,7 +459,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             // 
             this.cmbPageSize.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cmbPageSize.FormattingEnabled = true;
-            this.cmbPageSize.Location = new System.Drawing.Point(274, 17);
+            this.cmbPageSize.Location = new System.Drawing.Point(274, 7);
             this.cmbPageSize.Name = "cmbPageSize";
             this.cmbPageSize.Size = new System.Drawing.Size(70, 21);
             this.cmbPageSize.TabIndex = 0;
@@ -469,9 +469,9 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.Controls.Add(this.panelTop);
             this.Controls.Add(this.panelMain);
             this.Controls.Add(this.panelBottom);
-            this.Controls.Add(this.panelTop);
             this.Name = "LogViewerControl";
             this.Size = new System.Drawing.Size(1200, 650);
             this.panelTop.ResumeLayout(false);

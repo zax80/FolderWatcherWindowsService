@@ -1,3 +1,4 @@
+﻿using FolderWatcherWindowsService.Common.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -42,6 +43,11 @@ namespace FolderWatcherWindowsServiceAdmin
         private FolderManager folderManager;
         private List<string> watchedFolders;
 
+#if PREMIUM
+        // License management
+        private ILicenseService _licenseService;
+#endif
+
         public FolderWatcherWindowsServiceAdmin()
         {
             // create ServiceController instance for FolderWatcherWindowsService
@@ -51,46 +57,270 @@ namespace FolderWatcherWindowsServiceAdmin
             
             // Initialize folder management
             InitializeFolderManagement();
+
+            // CRITICAL FIX: Initialize layout for both FREE and PREMIUM
+            InitializeFormLayout();
         }
 
+#if PREMIUM
         /// <summary>
-        /// Initialize folder management components
+        /// Constructor with license service injection.
         /// </summary>
-        private void InitializeFolderManagement()
+        public FolderWatcherWindowsServiceAdmin(ILicenseService licenseService) : this()
         {
-            try
-            {
-                folderManager = new FolderManager();
-                watchedFolders = new List<string>();
-                
-                // Display config file path
-                lblConfigPathValue.Text = folderManager.ConfigFilePath;
-                
-                // Load watched folders
-                RefreshFoldersList();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error initializing folder management: {ex.Message}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
-
-        /// <summary>
-        /// On form load.
-        /// </summary>
-        /// <param name="sender">form</param>
-        /// <param name="e">event arguments</param>
-        private void FolderWatcherWindowsServiceAdmin_Load(object sender, EventArgs e)
-        {
-            CheckPermissions();
-            InitializeServiceMonitoring();
-
-            // Set the default tab to Service Control, but user can navigate to Log Viewer
-            tabControl1.SelectedIndex = 0;
+            _licenseService = licenseService;
             
-            // Refresh folders list to ensure it's up to date
-            RefreshFoldersList();
+            // CRITICAL: Initialize license UI AFTER base constructor completes
+            InitializeLicenseUI();
+        }
+
+        /// <summary>
+        /// Initialize license-related UI elements.
+        /// </summary>
+        private void InitializeLicenseUI()
+        {
+            // Update form title with license info
+            UpdateFormTitle();
+            
+            bool showLicenseBar = true;
+            
+#if !DEBUG
+            // In Release builds, check if we should hide the license bar for valid paid licenses
+            showLicenseBar = ShouldShowLicenseBar();
+            
+            if (!showLicenseBar)
+            {
+                System.Diagnostics.Debug.WriteLine("InitializeLicenseUI: Hiding license bar (valid paid license)");
+            }
+#endif
+    
+            if (showLicenseBar)
+            {
+                System.Diagnostics.Debug.WriteLine("InitializeLicenseUI: Creating license bar");
+                
+                // Create a new panel for license controls at the top of the form
+                var licensePanel = new Panel
+                {
+                    Name = "licensePanel",
+                    Height = 35,
+                    Dock = DockStyle.Top,
+                    BackColor = System.Drawing.Color.LightYellow,
+                    BorderStyle = BorderStyle.FixedSingle
+                };
+
+                // Add Buy License link
+                var lnkBuyLicense = new LinkLabel
+                {
+                    Text = "🛒 Buy License",
+                    AutoSize = true,
+                    Location = new System.Drawing.Point(10, 10),
+                    Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold)
+                };
+                lnkBuyLicense.Click += LnkBuyLicense_Click;
+
+                // Add Enter License button
+                var btnEnterLicense = new Button
+                {
+                    Text = "🔑 Enter License",
+                    AutoSize = true,
+                    Location = new System.Drawing.Point(120, 6),
+                    Height = 25
+                };
+                btnEnterLicense.Click += BtnEnterLicense_Click;
+
+                // Add license status label
+                var lblLicenseStatus = new Label
+                {
+                    Name = "lblLicenseStatus",
+                    AutoSize = true,
+                    Location = new System.Drawing.Point(240, 10),
+                    ForeColor = System.Drawing.Color.DarkBlue
+                };
+
+#if DEBUG  // Only in debug builds
+                var btnClearLicense = new Button
+                {
+                    Text = "🧪 Clear License (Test)",
+                    AutoSize = true,
+                    Location = new System.Drawing.Point(420, 6),
+                    Height = 25,
+                    BackColor = System.Drawing.Color.LightCoral
+                };
+                btnClearLicense.Click += (s, ev) => {
+                    try
+                    {
+                        using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\FolderWatcher", true))
+                        {
+                            key?.DeleteSubKey("License", false);
+                        }
+                        
+                        string licensePath = @"C:\ProgramData\FolderWatcher\license.dat";
+                        if (File.Exists(licensePath))
+                            File.Delete(licensePath);
+                        
+                        MessageBox.Show("License cleared! Restart the app to test.", "Test Helper");
+                        Application.Exit();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error: {ex.Message}", "Error");
+                    }
+                };
+                licensePanel.Controls.Add(btnClearLicense);
+#endif
+                licensePanel.Controls.Add(lnkBuyLicense);
+                licensePanel.Controls.Add(btnEnterLicense);
+                licensePanel.Controls.Add(lblLicenseStatus);
+
+                // Add panel to form
+                this.Controls.Add(licensePanel);
+                licensePanel.BringToFront();
+                
+                // Update license status
+                UpdateLicenseStatus();
+                
+                // CRITICAL: Re-adjust layout after adding license panel
+                AdjustFormLayout(licensePanel);
+            }
+            else
+            {
+                // No license panel needed - layout was already initialized
+                System.Diagnostics.Debug.WriteLine("InitializeLicenseUI: No license panel needed");
+            }
+
+            // Show trial reminder on startup if in trial mode
+            ShowTrialReminderOnStartup();
+        }
+#endif
+
+        /// <summary>
+        /// Initialize form layout (works for both FREE and PREMIUM versions).
+        /// This ensures proper control sizing and anchoring.
+        /// </summary>
+        private void InitializeFormLayout()
+        {
+            System.Diagnostics.Debug.WriteLine("InitializeFormLayout: Starting layout initialization");
+            
+            AdjustFormLayout(null);
+        }
+
+        /// <summary>
+        /// Adjust form layout based on whether a license panel exists.
+        /// </summary>
+        /// <param name="licensePanel">The license panel if it exists, null otherwise</param>
+        private void AdjustFormLayout(Panel licensePanel)
+        {
+            // Find the TabControl
+            var tabControl = this.Controls.Find("tabControl1", true).FirstOrDefault() as TabControl;
+            if (tabControl == null)
+            {
+                System.Diagnostics.Debug.WriteLine("AdjustFormLayout: WARNING - TabControl not found!");
+                return;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"AdjustFormLayout: Found TabControl, current Top={tabControl.Top}, Height={tabControl.Height}");
+            
+            // Adjust TabControl position based on whether license panel exists
+            if (licensePanel != null)
+            {
+                // Move TabControl down to make room for license panel
+                tabControl.Top = licensePanel.Bottom;
+                System.Diagnostics.Debug.WriteLine($"AdjustFormLayout: License panel exists - TabControl.Top set to {tabControl.Top}");
+            }
+            else
+            {
+                // No license panel - TabControl should start at top
+                tabControl.Top = 0;
+                System.Diagnostics.Debug.WriteLine("AdjustFormLayout: No license panel - TabControl.Top set to 0");
+            }
+            
+            // CRITICAL: Calculate height BEFORE setting it
+            int tabControlHeight = this.ClientSize.Height - tabControl.Top;
+            tabControl.Height = tabControlHeight;
+            
+            // Ensure proper anchoring for resize
+            tabControl.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            
+            System.Diagnostics.Debug.WriteLine($"AdjustFormLayout: TabControl adjusted - Top={tabControl.Top}, Height={tabControl.Height}");
+            
+            // Fix the layout of the Service Control tab (first tab)
+            if (tabControl.TabPages.Count > 0)
+            {
+                var serviceControlTab = tabControl.TabPages[0];
+                System.Diagnostics.Debug.WriteLine($"AdjustFormLayout: Fixing layout for tab '{serviceControlTab.Text}'");
+                
+                // CRITICAL: Calculate available height for controls
+                int availableHeight = tabControl.Height - tabControl.ItemSize.Height - 8; // Subtract tab header height and padding
+                
+                GroupBox grpServiceControl = null;
+                GroupBox grpFolderConfig = null;
+                
+                // Find and fix the groupboxes in Service Control tab
+                foreach (Control control in serviceControlTab.Controls)
+                {
+                    if (control is GroupBox groupBox)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"AdjustFormLayout: Found GroupBox '{groupBox.Name}' with Anchor={groupBox.Anchor}");
+                        
+                        // Service Control groupbox should stay at top
+                        if (groupBox.Name == "groupBoxService" || groupBox.Text.Contains("Service Control"))
+                        {
+                            grpServiceControl = groupBox;
+                            groupBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+                            System.Diagnostics.Debug.WriteLine($"AdjustFormLayout: Set Service Control anchor to Top|Left|Right, Height={groupBox.Height}");
+                        }
+                        // Watched Folders Configuration should fill remaining space
+                        else if (groupBox.Name == "groupBoxFolders" || groupBox.Text.Contains("Watched Folders"))
+                        {
+                            grpFolderConfig = groupBox;
+                            groupBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+                            System.Diagnostics.Debug.WriteLine($"AdjustFormLayout: Set Watched Folders anchor to Top|Bottom|Left|Right");
+                            
+                            // CRITICAL: Ensure ALL child controls have proper anchoring
+                            foreach (Control innerControl in groupBox.Controls)
+                            {
+                                if (innerControl is ListBox listBox)
+                                {
+                                    listBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+                                    System.Diagnostics.Debug.WriteLine($"AdjustFormLayout: Set ListBox anchor to Top|Bottom|Left|Right");
+                                }
+                                else if (innerControl is Button btn)
+                                {
+                                    // CRITICAL FIX: Buttons should anchor to the bottom
+                                    if (btn.Name == "btnAddFolder" || btn.Name == "btnRemoveFolder" || btn.Name == "btnEditFolder" ||
+                                        btn.Text.Contains("Add") || btn.Text.Contains("Remove") || btn.Text.Contains("Edit"))
+                                    {
+                                        btn.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+                                        System.Diagnostics.Debug.WriteLine($"AdjustFormLayout: Set Button '{btn.Name}' anchor to Bottom|Left");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // CRITICAL FIX: Adjust folder config groupbox height based on service control groupbox
+                if (grpServiceControl != null && grpFolderConfig != null)
+                {
+                    // Calculate proper position and height for folder config
+                    int serviceControlBottom = grpServiceControl.Bottom;
+                    int spacing = Math.Max(6, grpFolderConfig.Top - serviceControlBottom); // Maintain at least 6px spacing
+                    
+                    grpFolderConfig.Top = serviceControlBottom + spacing;
+                    grpFolderConfig.Height = availableHeight - grpFolderConfig.Top - 10; // 10px bottom margin
+                    
+                    System.Diagnostics.Debug.WriteLine($"AdjustFormLayout: Adjusted grpFolderConfig - Top={grpFolderConfig.Top}, Height={grpFolderConfig.Height}");
+                    System.Diagnostics.Debug.WriteLine($"AdjustFormLayout: Available height={availableHeight}, Service control height={grpServiceControl.Height}");
+                }
+                
+                // ELEGANT FIX: Force complete layout recalculation
+                serviceControlTab.PerformLayout();
+            }
+            
+            // Force TabControl to recalculate layout
+            tabControl.PerformLayout();
+            
+            System.Diagnostics.Debug.WriteLine("AdjustFormLayout: Layout adjustment complete");
         }
 
         /// <summary>
@@ -817,7 +1047,7 @@ namespace FolderWatcherWindowsServiceAdmin
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 serviceController.Start();
-                serviceController.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
+                serviceController.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(120));
             }, cancellationToken).ConfigureAwait(false);
 
             // Give service a moment to initialize
@@ -833,7 +1063,7 @@ namespace FolderWatcherWindowsServiceAdmin
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 serviceController.Stop();
-                serviceController.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
+                serviceController.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(120));
             }, cancellationToken).ConfigureAwait(false);
         }
 
@@ -872,9 +1102,11 @@ namespace FolderWatcherWindowsServiceAdmin
 
         /// <summary>
         /// Open the Alert Configuration dialog.
+        /// This feature is only available in PREMIUM builds.
         /// </summary>
         private void btnAlertConfig_Click(object sender, EventArgs e)
         {
+#if PREMIUM
             try
             {
                 using (var alertConfigForm = new AlertConfigForm())
@@ -897,6 +1129,14 @@ namespace FolderWatcherWindowsServiceAdmin
                 MessageBox.Show($"Error opening alert configuration: {ex.Message}",
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+#else
+            MessageBox.Show(
+                "Alert Settings is a PREMIUM feature.\n\n" +
+                "Upgrade to the PREMIUM version to access threat detection and alert configuration.",
+                "PREMIUM Feature",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+#endif
         }
 
         /// <summary>
@@ -1178,14 +1418,14 @@ namespace FolderWatcherWindowsServiceAdmin
             // Handle case where new folder has parent folders being watched
             if (parentFolders.Count > 0)
             {
-                string parentList = string.Join("\n� ", parentFolders);
+                string parentList = string.Join("\n• ", parentFolders);
                 string message;
                 
                 if (IsDriveRootScenario(parentFolders, newFolderPath))
                 {
                     message = $"WARNING: Drive-level monitoring detected!\n\n" +
                              $"The selected folder:\n'{newFolderPath}'\n\n" +
-                             $"is located on a drive that is already being monitored:\n� {parentList}\n\n" +
+                             $"is located on a drive that is already being monitored:\n• {parentList}\n\n" +
                              $"This will cause DUPLICATE LOGGING for all files in '{newFolderPath}'.\n\n" +
                              $"Monitoring an entire drive is very resource-intensive and may impact system performance.\n\n" +
                              $"Recommendation: Remove drive monitoring and monitor specific folders instead.\n\n" +
@@ -1194,7 +1434,7 @@ namespace FolderWatcherWindowsServiceAdmin
                 else
                 {
                     message = $"The selected folder:\n'{newFolderPath}'\n\n" +
-                             $"is a subfolder of these already monitored folders:\n� {parentList}\n\n" +
+                             $"is a subfolder of these already monitored folders:\n• {parentList}\n\n" +
                              $"This will cause duplicate logging for files in the selected folder.\n\n" +
                              $"Do you want to continue anyway?";
                 }
@@ -1212,27 +1452,27 @@ namespace FolderWatcherWindowsServiceAdmin
             // Handle case where new folder would be parent of existing folders
             if (childFolders.Count > 0)
             {
-                string childList = string.Join("\n� ", childFolders);
+                string childList = string.Join("\n• ", childFolders);
                 string message;
 
                 if (IsDriveRootScenario(new List<string> { newFolderPath }, childFolders.ToArray()))
                 {
                     message = $"WARNING: You are about to monitor an entire drive!\n\n" +
                              $"The selected folder:\n'{newFolderPath}'\n\n" +
-                             $"is a drive root that contains these currently monitored folders:\n� {childList}\n\n" +
+                             $"is a drive root that contains these currently monitored folders:\n• {childList}\n\n" +
                              $"Drive-level monitoring is very resource-intensive and may impact system performance.\n\n" +
                              $"Options:\n" +
-                             $"� YES: Monitor entire drive (will remove specific folder monitoring)\n" +
-                             $"� NO: Keep monitoring specific folders only\n\n" +
+                             $"• YES: Monitor entire drive (will remove specific folder monitoring)\n" +
+                             $"• NO: Keep monitoring specific folders only\n\n" +
                              $"Do you want to monitor the entire drive?";
                 }
                 else
                 {
                     message = $"The selected folder:\n'{newFolderPath}'\n\n" +
-                             $"is a parent folder of these currently monitored folders:\n� {childList}\n\n" +
+                             $"is a parent folder of these currently monitored folders:\n• {childList}\n\n" +
                              $"Do you want to:\n" +
-                             $"� YES: Remove the specific folders and monitor the parent folder\n" +
-                             $"� NO: Keep the current specific folder monitoring";
+                             $"• YES: Remove the specific folders and monitor the parent folder\n" +
+                             $"• NO: Keep the current specific folder monitoring";
                 }
 
                 DialogResult dialogResult = MessageBox.Show(message, "Parent Folder Selection", 
@@ -1285,21 +1525,21 @@ namespace FolderWatcherWindowsServiceAdmin
             // Handle parent folder conflicts
             if (parentFolders.Count > 0)
             {
-                string parentList = string.Join("\n� ", parentFolders);
+                string parentList = string.Join("\n• ", parentFolders);
                 string message;
                 
                 if (IsDriveRootScenario(parentFolders, newFolderPath))
                 {
                     message = $"WARNING: Drive-level monitoring detected!\n\n" +
                              $"The new folder path:\n'{newFolderPath}'\n\n" +
-                             $"is located on a drive that is already being monitored:\n� {parentList}\n\n" +
+                             $"is located on a drive that is already being monitored:\n• {parentList}\n\n" +
                              $"This will cause DUPLICATE LOGGING for all files in '{newFolderPath}'.\n\n" +
                              $"Do you want to continue with this change?";
                 }
                 else
                 {
                     message = $"The new folder path:\n'{newFolderPath}'\n\n" +
-                             $"is a subfolder of these monitored folders:\n� {parentList}\n\n" +
+                             $"is a subfolder of these monitored folders:\n• {parentList}\n\n" +
                              $"This will cause duplicate logging. Do you want to continue?";
                 }
 
@@ -1314,20 +1554,20 @@ namespace FolderWatcherWindowsServiceAdmin
             // Handle child folder conflicts
             if (childFolders.Count > 0)
             {
-                string childList = string.Join("\n� ", childFolders);
+                string childList = string.Join("\n• ", childFolders);
                 string message;
 
                 if (IsDriveRootScenario(new List<string> { newFolderPath }, childFolders.ToArray()))
                 {
                     message = $"WARNING: You are changing to monitor an entire drive!\n\n" +
                              $"The new folder path:\n'{newFolderPath}'\n\n" +
-                             $"contains these currently monitored folders:\n� {childList}\n\n" +
+                             $"contains these currently monitored folders:\n• {childList}\n\n" +
                              $"Do you want to remove the specific folders and monitor the entire drive?";
                 }
                 else
                 {
                     message = $"The new folder path:\n'{newFolderPath}'\n\n" +
-                             $"is a parent of these monitored folders:\n� {childList}\n\n" +
+                             $"is a parent of these monitored folders:\n• {childList}\n\n" +
                              $"Do you want to remove them and monitor the parent folder instead?";
                 }
 
@@ -1435,7 +1675,7 @@ namespace FolderWatcherWindowsServiceAdmin
                 // Add warning indicator for drive roots
                 if (IsDriveRoot(folder))
                 {
-                    displayText += " ? [DRIVE ROOT - HIGH RESOURCE USAGE]";
+                    displayText += " ⚠️ [DRIVE ROOT - HIGH RESOURCE USAGE]";
                 }
                 
                 listBoxFolders.Items.Add(displayText);
@@ -1596,6 +1836,490 @@ namespace FolderWatcherWindowsServiceAdmin
                 get { return CanAdd; } 
                 set { CanAdd = value; } 
             }
+        }
+
+#if PREMIUM
+        /// <summary>
+        /// Update the form title with license information.
+        /// </summary>
+        private void UpdateFormTitle()
+        {
+            if (_licenseService == null)
+            {
+                this.Text = "Folder Watcher Service Admin - PREMIUM";
+                return;
+            }
+
+            try
+            {
+                var licenseInfo = _licenseService.GetLicenseInfo();
+                var hasLicenseProperty = licenseInfo.GetType().GetProperty("HasLicense");
+                
+                if (hasLicenseProperty != null)
+                {
+                    bool hasLicense = (bool)hasLicenseProperty.GetValue(licenseInfo);
+                    
+                    if (hasLicense)
+                    {
+                        this.Text = "Folder Watcher Service Admin - PREMIUM (Licensed)";
+                    }
+                    else
+                    {
+                        int remainingDays = _licenseService.GetRemainingTrialDays();
+                        this.Text = $"Folder Watcher Service Admin - PREMIUM (Trial: {remainingDays} days)";
+                    }
+                }
+                else
+                {
+                    this.Text = "Folder Watcher Service Admin - PREMIUM";
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"UpdateFormTitle ERROR: {ex.Message}");
+                this.Text = "Folder Watcher Service Admin - PREMIUM";
+            }
+        }
+
+        /// <summary>
+        /// Show trial reminder dialog on application startup.
+        /// </summary>
+        private void ShowTrialReminderOnStartup()
+        {
+            if (_licenseService == null)
+                return;
+
+            try
+            {
+                var licenseInfo = _licenseService.GetLicenseInfo();
+                var hasLicenseProperty = licenseInfo.GetType().GetProperty("HasLicense");
+                
+                if (hasLicenseProperty != null)
+                {
+                    bool hasLicense = (bool)hasLicenseProperty.GetValue(licenseInfo);
+                    
+                    if (!hasLicense)
+                    {
+                        int remainingDays = _licenseService.GetRemainingTrialDays();
+                        
+                        if (remainingDays <= 0)
+                        {
+                            MessageBox.Show(
+                                "Your trial period has expired.\n\n" +
+                                "Please purchase a license to continue using PREMIUM features.\n\n" +
+                                "Click 'Buy License' to visit our website.",
+                                "Trial Expired",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+                        }
+                        else if (remainingDays <= 7)
+                        {
+                            MessageBox.Show(
+                                $"Your trial period expires in {remainingDays} day(s).\n\n" +
+                                "Please consider purchasing a license to continue using PREMIUM features.",
+                                "Trial Reminder",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ShowTrialReminderOnStartup ERROR: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Handle Buy License link click.
+        /// </summary>
+        private void LnkBuyLicense_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Open purchase URL in default browser
+                string purchaseUrl = "https://yourcompany.com/purchase"; // Replace with actual URL
+                System.Diagnostics.Process.Start(purchaseUrl);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Unable to open purchase page: {ex.Message}\n\n" +
+                    "Please visit our website manually to purchase a license.",
+                    "Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+        }
+
+        /// <summary>
+        /// Handle Enter License button click.
+        /// </summary>
+        private void BtnEnterLicense_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (var licenseKeyForm = new Form())
+                {
+                    licenseKeyForm.Text = "Enter License Key";
+                    licenseKeyForm.Size = new System.Drawing.Size(500, 200);
+                    licenseKeyForm.StartPosition = FormStartPosition.CenterParent;
+                    licenseKeyForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                    licenseKeyForm.MaximizeBox = false;
+                    licenseKeyForm.MinimizeBox = false;
+
+                    var lblPrompt = new Label
+                    {
+                        Text = "Please enter your license key:",
+                        Location = new System.Drawing.Point(20, 20),
+                        AutoSize = true
+                    };
+
+                    var txtLicenseKey = new TextBox
+                    {
+                        Location = new System.Drawing.Point(20, 50),
+                        Width = 440,
+                        Font = new System.Drawing.Font("Courier New", 10F)
+                    };
+
+                    var btnOk = new Button
+                    {
+                        Text = "Activate",
+                        Location = new System.Drawing.Point(280, 100),
+                        DialogResult = DialogResult.OK
+                    };
+
+                    var btnCancel = new Button
+                    {
+                        Text = "Cancel",
+                        Location = new System.Drawing.Point(370, 100),
+                        DialogResult = DialogResult.Cancel
+                    };
+
+                    licenseKeyForm.Controls.AddRange(new Control[] { lblPrompt, txtLicenseKey, btnOk, btnCancel });
+                    licenseKeyForm.AcceptButton = btnOk;
+                    licenseKeyForm.CancelButton = btnCancel;
+
+                    if (licenseKeyForm.ShowDialog(this) == DialogResult.OK)
+                    {
+                        string licenseKey = txtLicenseKey.Text.Trim();
+                        
+                        if (string.IsNullOrWhiteSpace(licenseKey))
+                        {
+                            MessageBox.Show("Please enter a valid license key.", "Invalid Input",
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+
+                        // Attempt to activate the license
+                        var result = _licenseService.ActivateLicense(licenseKey);
+                        
+                        // Use reflection to get the Success property
+                        var successProperty = result.GetType().GetProperty("Success");
+                        var messageProperty = result.GetType().GetProperty("Message");
+                        
+                        if (successProperty != null && messageProperty != null)
+                        {
+                            bool success = (bool)successProperty.GetValue(result);
+                            string message = messageProperty.GetValue(result)?.ToString() ?? "Unknown result";
+                            
+                            if (success)
+                            {
+                                MessageBox.Show(message, "Activation Successful",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                
+                                // Update UI to reflect new license status
+                                UpdateFormTitle();
+                                UpdateLicenseStatus();
+                            }
+                            else
+                            {
+                                MessageBox.Show(message, "Activation Failed",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }
+                        else
+                        {
+                            MessageBox.Show("License activation result format error.", "Error",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error activating license: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Determine if the license bar should be shown.
+        /// In Debug builds: always show for testing.
+        /// In Release builds: only show for Trial, No License, Expired, or Expiring Soon.
+        /// </summary>
+        /// <returns>True if license bar should be visible, false otherwise</returns>
+        private bool ShouldShowLicenseBar()
+        {
+            if (_licenseService == null)
+            {
+                System.Diagnostics.Debug.WriteLine("ShouldShowLicenseBar: _licenseService is null - showing bar");
+                return true; // Show by default if service unavailable
+            }
+            
+            try
+            {
+                var licenseInfo = _licenseService.GetLicenseInfo();
+                
+                // Get properties using reflection (same pattern as UpdateLicenseStatus)
+                var hasLicenseProperty = licenseInfo.GetType().GetProperty("HasLicense");
+                var typeProperty = licenseInfo.GetType().GetProperty("Type");
+                var isValidProperty = licenseInfo.GetType().GetProperty("IsValid");
+                var needsRenewalProperty = licenseInfo.GetType().GetProperty("NeedsRenewal");
+                
+                if (hasLicenseProperty == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("ShouldShowLicenseBar: HasLicense property not found - showing bar");
+                    return true;
+                }
+                
+                bool hasLicense = (bool)hasLicenseProperty.GetValue(licenseInfo);
+                
+                // No license at all - SHOW bar
+                if (!hasLicense)
+                {
+                    System.Diagnostics.Debug.WriteLine("ShouldShowLicenseBar: No license found - SHOW bar");
+                    return true;
+                }
+                
+                // Check if license is valid
+                if (isValidProperty != null)
+                {
+                    bool isValid = (bool)isValidProperty.GetValue(licenseInfo);
+                    if (!isValid)
+                    {
+                        System.Diagnostics.Debug.WriteLine("ShouldShowLicenseBar: License is invalid - SHOW bar");
+                        return true; // Show bar for invalid licenses
+                    }
+                }
+                
+                // Check license type
+                if (typeProperty != null)
+                {
+                    string licenseType = typeProperty.GetValue(licenseInfo)?.ToString() ?? "";
+                    System.Diagnostics.Debug.WriteLine($"ShouldShowLicenseBar: License type = '{licenseType}'");
+                    
+                    // TRIAL license - ALWAYS SHOW bar
+                    if (licenseType.Equals("Trial", StringComparison.OrdinalIgnoreCase))
+                    {
+                        System.Diagnostics.Debug.WriteLine("ShouldShowLicenseBar: Trial license - SHOW bar");
+                        return true;
+                    }
+                    
+                    // PAID license
+                    if (licenseType.Equals("Paid", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Check if expiring soon (within 7 days as defined in LicenseInfo.NeedsRenewal)
+                        if (needsRenewalProperty != null)
+                        {
+                            bool needsRenewal = (bool)needsRenewalProperty.GetValue(licenseInfo);
+                            if (needsRenewal)
+                            {
+                                System.Diagnostics.Debug.WriteLine("ShouldShowLicenseBar: Paid license expiring soon - SHOW bar");
+                                return true;
+                            }
+                        }
+                        
+                        // Valid paid license, not expiring soon - HIDE bar (in Release only)
+                        System.Diagnostics.Debug.WriteLine("ShouldShowLicenseBar: Valid Paid license with no renewal needed - HIDE bar");
+                        return false;
+                    }
+                }
+                
+                // Unknown state or couldn't determine type - show bar to be safe
+                System.Diagnostics.Debug.WriteLine("ShouldShowLicenseBar: Unknown license state - SHOW bar (safe default)");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ShouldShowLicenseBar ERROR: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"ShouldShowLicenseBar Stack: {ex.StackTrace}");
+                return true; // Show bar on error (safe default)
+            }
+        }
+#endif
+
+        /// <summary>
+        /// Initialize folder management system and load watched folders.
+        /// </summary>
+        private void InitializeFolderManagement()
+        {
+            try
+            {
+                // Initialize folder manager
+                folderManager = new FolderManager();
+                
+                // Load watched folders from configuration
+                watchedFolders = folderManager.GetWatchedFolders();
+                
+                // Update the UI with loaded folders (only if controls are initialized)
+                if (this.IsHandleCreated && !this.IsDisposed)
+                {
+                    UpdateFoldersListBox();
+                }
+                
+                System.Diagnostics.Debug.WriteLine($"Folder management initialized. Loaded {watchedFolders.Count} watched folders.");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error initializing folder management: {ex.Message}");
+                MessageBox.Show(
+                    $"Error initializing folder management: {ex.Message}\n\n" +
+                    "The application will continue, but folder configuration may not be available.",
+                    "Initialization Warning",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+
+                // Initialize with empty list as fallback
+                watchedFolders = new List<string>();
+            }
+        }
+
+#if PREMIUM
+        /// <summary>
+        /// Update the license status label in the license bar.
+        /// </summary>
+        private void UpdateLicenseStatus()
+        {
+            if (_licenseService == null)
+            {
+                System.Diagnostics.Debug.WriteLine("UpdateLicenseStatus: _licenseService is null");
+                return;
+            }
+
+            try
+            {
+                // Find the license status label
+                var licensePanel = this.Controls.Find("licensePanel", false).FirstOrDefault() as Panel;
+                if (licensePanel == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("UpdateLicenseStatus: License panel not found");
+                    return;
+                }
+
+                var lblLicenseStatus = licensePanel.Controls.Find("lblLicenseStatus", false).FirstOrDefault() as Label;
+                if (lblLicenseStatus == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("UpdateLicenseStatus: License status label not found");
+                    return;
+                }
+
+                // Get license information
+                var licenseInfo = _licenseService.GetLicenseInfo();
+                var hasLicenseProperty = licenseInfo.GetType().GetProperty("HasLicense");
+                var typeProperty = licenseInfo.GetType().GetProperty("Type");
+                var isValidProperty = licenseInfo.GetType().GetProperty("IsValid");
+                
+                if (hasLicenseProperty == null)
+                {
+                    lblLicenseStatus.Text = "License status unavailable";
+                    lblLicenseStatus.ForeColor = System.Drawing.Color.Gray;
+                    return;
+                }
+
+                bool hasLicense = (bool)hasLicenseProperty.GetValue(licenseInfo);
+                
+                if (!hasLicense)
+                {
+                    int remainingDays = _licenseService.GetRemainingTrialDays();
+                    if (remainingDays <= 0)
+                    {
+                        lblLicenseStatus.Text = "⚠️ Trial Expired";
+                        lblLicenseStatus.ForeColor = System.Drawing.Color.Red;
+                    }
+                    else
+                    {
+                        lblLicenseStatus.Text = $"📅 Trial: {remainingDays} day(s) remaining";
+                        lblLicenseStatus.ForeColor = remainingDays <= 7 ? System.Drawing.Color.OrangeRed : System.Drawing.Color.DarkBlue;
+                    }
+                    return;
+                }
+
+                // Check if license is valid
+                if (isValidProperty != null)
+                {
+                    bool isValid = (bool)isValidProperty.GetValue(licenseInfo);
+                    if (!isValid)
+                    {
+                        lblLicenseStatus.Text = "❌ Invalid License";
+                        lblLicenseStatus.ForeColor = System.Drawing.Color.Red;
+                        return;
+                    }
+                }
+
+                // Check license type
+                if (typeProperty != null)
+                {
+                    string licenseType = typeProperty.GetValue(licenseInfo)?.ToString() ?? "";
+                    
+                    if (licenseType.Equals("Trial", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int remainingDays = _licenseService.GetRemainingTrialDays();
+                        lblLicenseStatus.Text = $"📅 Trial: {remainingDays} day(s) remaining";
+                        lblLicenseStatus.ForeColor = remainingDays <= 7 ? System.Drawing.Color.OrangeRed : System.Drawing.Color.DarkBlue;
+                    }
+                    else if (licenseType.Equals("Paid", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Check if needs renewal
+                        var needsRenewalProperty = licenseInfo.GetType().GetProperty("NeedsRenewal");
+                        if (needsRenewalProperty != null)
+                        {
+                            bool needsRenewal = (bool)needsRenewalProperty.GetValue(licenseInfo);
+                            if (needsRenewal)
+                            {
+                                lblLicenseStatus.Text = "⚠️ License expiring soon";
+                                lblLicenseStatus.ForeColor = System.Drawing.Color.OrangeRed;
+                            }
+                            else
+                            {
+                                lblLicenseStatus.Text = "✅ Licensed";
+                                lblLicenseStatus.ForeColor = System.Drawing.Color.Green;
+                            }
+                        }
+                        else
+                        {
+                            lblLicenseStatus.Text = "✅ Licensed";
+                            lblLicenseStatus.ForeColor = System.Drawing.Color.Green;
+                        }
+                    }
+                    else
+                    {
+                        lblLicenseStatus.Text = $"License Type: {licenseType}";
+                        lblLicenseStatus.ForeColor = System.Drawing.Color.DarkBlue;
+                    }
+                }
+                else
+                {
+                    lblLicenseStatus.Text = "✅ Licensed";
+                    lblLicenseStatus.ForeColor = System.Drawing.Color.Green;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"UpdateLicenseStatus ERROR: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"UpdateLicenseStatus Stack: {ex.StackTrace}");
+            }
+        }
+#endif
+
+        private void FolderWatcherWindowsServiceAdmin_Load(object sender, EventArgs e)
+        {
+            // Initialize form layout, service monitoring, and folder management
+            InitializeFormLayout();
+            InitializeServiceMonitoring();
+            InitializeFolderManagement();
+            RefreshFoldersList();
+            UpdateUI();
         }
     }
 }

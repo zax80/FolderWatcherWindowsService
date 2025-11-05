@@ -202,7 +202,12 @@ namespace FolderWatcherWindowsServiceAdmin
             this.btnAlertConfig.TabIndex = 3;
             this.btnAlertConfig.Text = "Alert Settings...";
             this.btnAlertConfig.UseVisualStyleBackColor = true;
+#if PREMIUM
             this.btnAlertConfig.Click += new System.EventHandler(this.btnAlertConfig_Click);
+#else
+            this.btnAlertConfig.Enabled = false;
+            this.btnAlertConfig.Visible = false;
+#endif
             // 
             // lblStatus
             // 

@@ -6,31 +6,31 @@ namespace FolderWatcherWindowsService.Services
 {
     /// <summary>
     /// Null Object implementation of IThreatDetectionService.
-  /// Used in free version when threat detection module is not available.
+    /// Used in free version when threat detection module is not available.
     /// SOLID: Null Object Pattern - provides do-nothing implementation.
     /// </summary>
     public class NullThreatDetectionService : IThreatDetectionService
     {
         /// <summary>
-   /// Initialize - no-op for null implementation.
-      /// </summary>
-   public bool Initialize()
+        /// Initialize - no-op for null implementation.
+        /// </summary>
+        public bool Initialize()
         {
-        return true;
+            return true;
         }
 
         /// <summary>
         /// Initialize with config - no-op for null implementation.
-      /// </summary>
+        /// </summary>
         public bool Initialize(object config)
         {
             return true;
         }
 
         /// <summary>
-      /// Analyze - no-op for null implementation.
+        /// Analyze - no-op for null implementation.
         /// </summary>
-  public Task AnalyzeAsync(FileSystemLogEntry entry)
+        public Task AnalyzeAsync(FileSystemLogEntry entry)
         {
             return Task.CompletedTask;
         }
@@ -38,8 +38,8 @@ namespace FolderWatcherWindowsService.Services
         /// <summary>
         /// Cleanup - no-op for null implementation.
         /// </summary>
-public void Cleanup()
-      {
+        public void Cleanup()
+        {
             // No resources to clean up
         }
     }

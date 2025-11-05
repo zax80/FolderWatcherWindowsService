@@ -32,7 +32,25 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             _filteredEntries = new List<LogEntry>();
             
             InitializeComponent();
+            FixControlOrder(); // Add this line
             InitializeLogViewer();
+        }
+
+        /// <summary>
+        /// Fixes the control Z-order to ensure panelBottom is visible.
+        /// </summary>
+        private void FixControlOrder()
+        {
+            // Reorder controls so docking works correctly
+            this.Controls.SetChildIndex(this.panelBottom, 0);
+            this.Controls.SetChildIndex(this.panelTop, 1);
+            this.Controls.SetChildIndex(this.panelMain, 2);
+            
+            // Ensure panelBottom has enough height for all controls
+            panelBottom.Height = 70; // Increase from 50 to 70
+            
+            // Make sure panelPagination is visible and on top
+            panelPagination.BringToFront();
         }
 
         private void InitializeLogViewer()

@@ -10,7 +10,7 @@ namespace FolderWatcherWindowsService
     /// <summary>
     /// Handles CSV formatting and logging.
     /// </summary>
-    internal class CsvLogger
+    public class CsvLogger
     {
         private readonly ILog _logger;
 

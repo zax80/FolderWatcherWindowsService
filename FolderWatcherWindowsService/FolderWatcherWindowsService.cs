@@ -3,6 +3,11 @@ using System;
 using System.Configuration;
 using System.Diagnostics;
 using System.ServiceProcess;
+using FolderWatcherWindowsService.Common.Interfaces;
+
+#if PREMIUM
+using FolderWatcherWindowsService.Licensing.Services;
+#endif
 
 namespace FolderWatcherWindowsService
 {
@@ -14,6 +19,9 @@ namespace FolderWatcherWindowsService
         private readonly ILog _logger;
         private readonly WatcherManager _watcherManager;
         private readonly CsvLogger _csvLogger;
+#if PREMIUM
+        private readonly ILicenseService _licenseService;
+#endif
 
         public FolderWatcherWindowsService()
         {
@@ -21,6 +29,12 @@ namespace FolderWatcherWindowsService
 
             ConfigureLog4Net();
             _logger = LogManager.GetLogger("servicelog");
+            
+#if PREMIUM
+            // Initialize licensing first
+            _licenseService = new LicenseService(_logger);
+#endif
+            
             _csvLogger = new CsvLogger(_logger);
             _watcherManager = new WatcherManager(_logger, _csvLogger);
         }
@@ -31,6 +45,30 @@ namespace FolderWatcherWindowsService
             {
                 LogServiceEvent("Folder Watcher Windows Service is starting.", EventLogEntryType.Information);
                 _logger?.Info("Service starting - initializing folder watchers");
+
+#if PREMIUM
+                // Check license before starting
+                _logger?.Info("Validating license...");
+                if (!_licenseService.Initialize())
+                {
+                    string errorMessage = $"Service cannot start - Invalid or missing license.";
+
+                    _logger?.Error(errorMessage);
+                    LogServiceEvent(errorMessage, EventLogEntryType.Error);
+
+                    // Log additional license information for troubleshooting
+                    var licenseInfo = _licenseService.GetLicenseInfo();
+                    _logger?.Info($"License Info: {licenseInfo}");
+
+                    throw new InvalidOperationException(errorMessage);
+                }
+
+                var license = _licenseService.GetLicenseInfo();
+                _logger?.Info($"License validated successfully: {license}");
+                LogServiceEvent($"License validated - Type: {license}", EventLogEntryType.Information);
+#else
+                _logger?.Info("Running in FREE mode - no license validation required");
+#endif
 
                 ConfigurationManager.RefreshSection("appSettings");
 
@@ -54,6 +92,10 @@ namespace FolderWatcherWindowsService
                 _logger?.Info("Service stopping - cleaning up resources");
 
                 _watcherManager.StopWatching();
+
+#if PREMIUM
+                _licenseService?.Cleanup();
+#endif
 
                 _logger?.Info("Service stopped successfully");
             }
