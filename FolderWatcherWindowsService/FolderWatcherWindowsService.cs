@@ -4,6 +4,7 @@ using System.Configuration;
 using System.Diagnostics;
 using System.ServiceProcess;
 using FolderWatcherWindowsService.Common.Interfaces;
+using FolderWatcherWindowsService.Common.Logging;
 
 #if PREMIUM
 using FolderWatcherWindowsService.Licensing.Services;
@@ -27,11 +28,11 @@ namespace FolderWatcherWindowsService
         {
             InitializeComponent();
 
-            ConfigureLog4Net();
+            // Force log4net initialization
+            Log4NetAutoInit.EnsureInitialized();
             _logger = LogManager.GetLogger("servicelog");
-            
+
 #if PREMIUM
-            // Initialize licensing first
             _licenseService = new LicenseService(_logger);
 #endif
             
@@ -43,43 +44,26 @@ namespace FolderWatcherWindowsService
         {
             try
             {
-                LogServiceEvent("Folder Watcher Windows Service is starting.", EventLogEntryType.Information);
-                _logger?.Info("Service starting - initializing folder watchers");
+                LogServiceEvent("Service starting.", EventLogEntryType.Information);
+                _logger?.Info("Service starting...");
 
 #if PREMIUM
-                // Check license before starting
-                _logger?.Info("Validating license...");
                 if (!_licenseService.Initialize())
                 {
-                    string errorMessage = $"Service cannot start - Invalid or missing license.";
-
-                    _logger?.Error(errorMessage);
-                    LogServiceEvent(errorMessage, EventLogEntryType.Error);
-
-                    // Log additional license information for troubleshooting
-                    var licenseInfo = _licenseService.GetLicenseInfo();
-                    _logger?.Info($"License Info: {licenseInfo}");
-
-                    throw new InvalidOperationException(errorMessage);
+                    _logger?.Error("Invalid license");
+                    throw new InvalidOperationException("Invalid license");
                 }
-
-                var license = _licenseService.GetLicenseInfo();
-                _logger?.Info($"License validated successfully: {license}");
-                LogServiceEvent($"License validated - Type: {license}", EventLogEntryType.Information);
-#else
-                _logger?.Info("Running in FREE mode - no license validation required");
+                _logger?.Info($"License: {_licenseService.GetLicenseInfo()}");
 #endif
 
                 ConfigurationManager.RefreshSection("appSettings");
-
                 _csvLogger.WriteHeader();
                 _watcherManager.StartWatching(Properties.Settings.Default.FolderPaths);
-
-                _logger?.Info("Service started successfully");
+                _logger?.Info("Service started");
             }
             catch (Exception ex)
             {
-                LogServiceError("Failed to start service", ex);
+                LogServiceError("Start failed", ex);
                 throw;
             }
         }
@@ -88,32 +72,16 @@ namespace FolderWatcherWindowsService
         {
             try
             {
-                LogServiceEvent("Folder Watcher Windows Service is stopping.", EventLogEntryType.Information);
-                _logger?.Info("Service stopping - cleaning up resources");
-
+                _logger?.Info("Service stopping...");
                 _watcherManager.StopWatching();
-
 #if PREMIUM
                 _licenseService?.Cleanup();
 #endif
-
-                _logger?.Info("Service stopped successfully");
+                _logger?.Info("Service stopped");
             }
             catch (Exception ex)
             {
-                LogServiceError("Error during service stop", ex);
-            }
-        }
-
-        private void ConfigureLog4Net()
-        {
-            try
-            {
-                log4net.Config.XmlConfigurator.Configure();
-            }
-            catch (Exception ex)
-            {
-                EventLog.WriteEntry($"Failed to configure Log4Net: {ex.Message}", EventLogEntryType.Error);
+                LogServiceError("Stop error", ex);
             }
         }
 
@@ -124,9 +92,8 @@ namespace FolderWatcherWindowsService
 
         private void LogServiceError(string message, Exception ex)
         {
-            string errorMsg = $"{message}: {ex.Message}";
-            EventLog.WriteEntry(errorMsg, EventLogEntryType.Error);
-            _logger?.Error(errorMsg, ex);
+            EventLog.WriteEntry($"{message}: {ex.Message}", EventLogEntryType.Error);
+            _logger?.Error(message, ex);
         }
     }
 }

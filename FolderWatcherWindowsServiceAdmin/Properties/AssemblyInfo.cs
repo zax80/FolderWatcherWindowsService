@@ -6,9 +6,9 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("FolderWatcherWindowsServiceAdmin")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyDescription("Administrative UI for configuring and managing FolderWatcher services, monitored folders, and processing rules.")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("Balkan Enterprise Solutions Ltd")]
 [assembly: AssemblyProduct("FolderWatcherWindowsServiceAdmin")]
 [assembly: AssemblyCopyright("Copyright ©  2023")]
 [assembly: AssemblyTrademark("")]

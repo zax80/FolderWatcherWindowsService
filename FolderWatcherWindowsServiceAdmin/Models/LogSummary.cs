@@ -9,7 +9,7 @@ namespace FolderWatcherWindowsServiceAdmin.Models
     {
         public int TotalRecords { get; set; }
         public int RecentActivityCount { get; set; }
-        public int ErrorCount { get; set; }
+        public int UnknownCount { get; set; }
         public int CreatedCount { get; set; }
         public int ModifiedCount { get; set; }
         public int DeletedCount { get; set; }

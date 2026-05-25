@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -12,6 +12,7 @@ namespace FolderWatcherWindowsServiceAdmin.Services
 {
     /// <summary>
     /// Service for parsing log4net log files and extracting CSV data with optimized performance.
+    /// SIMPLIFIED: Uses a more flexible regex that works with any log4net pattern.
     /// </summary>
     public class LogParser
     {
@@ -21,13 +22,19 @@ namespace FolderWatcherWindowsServiceAdmin.Services
         private const int LargeFileThreshold = 10 * 1024 * 1024; // 10MB
         private static int _debugEntryCount = 0; // Debug counter for logging first few entries
 
+        // Expected CSV field count (based on FileSystemLogEntry model)
+        private const int ExpectedCsvFieldCount = 11;
+
         public LogParser(string logFilePath)
         {
             _logFilePath = logFilePath;
-            // Pre-compiled pattern to match log4net format: LEVEL DATE TIME MESSAGE
-            _logLinePattern = new Regex(@"^(INFO|ERROR|DEBUG|WARN)\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d{3})\s+\d+\s+(.*)$", 
+
+            // SIMPLIFIED: Match any line that contains a log level and has commas (CSV data)
+            // This is more flexible and works with various log4net formats
+            _logLinePattern = new Regex(
+                @"^.*?(INFO|ERROR|DEBUG|WARN)\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}[,\.]\d{3}).*?(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}[.,]\d{3},.*)$",
                 RegexOptions.Compiled);
-            
+
             // Reset debug counter for this parser instance
             _debugEntryCount = 0;
         }
@@ -41,26 +48,31 @@ namespace FolderWatcherWindowsServiceAdmin.Services
 
             if (!File.Exists(_logFilePath))
             {
+                System.Diagnostics.Debug.WriteLine($"Log file does not exist: {_logFilePath}");
                 return entries;
             }
 
             try
             {
                 var fileInfo = new FileInfo(_logFilePath);
-                
+                System.Diagnostics.Debug.WriteLine($"Parsing log file: {_logFilePath} ({fileInfo.Length:N0} bytes)");
+
                 // Use different strategies based on file size
                 if (fileInfo.Length > LargeFileThreshold)
                 {
+                    System.Diagnostics.Debug.WriteLine("Using large file parsing strategy (parallel)");
                     return ParseLargeFile();
                 }
                 else
                 {
+                    System.Diagnostics.Debug.WriteLine("Using small/medium file parsing strategy (sequential)");
                     return ParseSmallToMediumFile();
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error parsing log file: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
                 return entries;
             }
         }
@@ -71,6 +83,9 @@ namespace FolderWatcherWindowsServiceAdmin.Services
         private List<LogEntry> ParseSmallToMediumFile()
         {
             var entries = new List<LogEntry>();
+            var lineNumber = 0;
+            var skippedLines = 0;
+            var parsedLines = 0;
 
             using (var fileStream = new FileStream(_logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, DefaultBufferSize))
             using (var reader = new StreamReader(fileStream, Encoding.UTF8, true, DefaultBufferSize))
@@ -78,14 +93,22 @@ namespace FolderWatcherWindowsServiceAdmin.Services
                 string line;
                 while ((line = reader.ReadLine()) != null)
                 {
-                    var entry = ParseLogLine(line);
+                    lineNumber++;
+
+                    var entry = ParseLogLine(line, lineNumber);
                     if (entry != null)
                     {
                         entries.Add(entry);
+                        parsedLines++;
+                    }
+                    else
+                    {
+                        skippedLines++;
                     }
                 }
             }
 
+            System.Diagnostics.Debug.WriteLine($"Parsing complete: {lineNumber} total lines, {parsedLines} parsed, {skippedLines} skipped");
             return entries.OrderByDescending(e => e.Timestamp).ToList();
         }
 
@@ -95,6 +118,7 @@ namespace FolderWatcherWindowsServiceAdmin.Services
         private List<LogEntry> ParseLargeFile()
         {
             var allLines = new List<string>();
+            var lineNumber = 0;
 
             // Read all lines efficiently
             using (var fileStream = new FileStream(_logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, DefaultBufferSize))
@@ -104,17 +128,21 @@ namespace FolderWatcherWindowsServiceAdmin.Services
                 while ((line = reader.ReadLine()) != null)
                 {
                     allLines.Add(line);
+                    lineNumber++;
                 }
             }
+
+            System.Diagnostics.Debug.WriteLine($"Read {lineNumber} lines, starting parallel parsing...");
 
             // Parse lines in parallel for better performance on large files
             var entries = allLines
                 .AsParallel()
                 .WithDegreeOfParallelism(Environment.ProcessorCount)
-                .Select(ParseLogLine)
+                .Select((line, index) => ParseLogLine(line, index + 1))
                 .Where(entry => entry != null)
                 .ToList();
 
+            System.Diagnostics.Debug.WriteLine($"Parallel parsing complete: {entries.Count} entries parsed");
             return entries.OrderByDescending(e => e.Timestamp).ToList();
         }
 
@@ -132,11 +160,16 @@ namespace FolderWatcherWindowsServiceAdmin.Services
 
             try
             {
-                var lines = ReadLastLinesOptimized(_logFilePath, count * 2); // Read extra to account for non-CSV lines
-                
+                // Read extra lines to account for non-CSV lines
+                var lines = ReadLastLinesOptimized(_logFilePath, count * 3);
+
+                System.Diagnostics.Debug.WriteLine($"Read {lines.Count} lines for last {count} entries");
+
+                var lineNumber = 0;
                 foreach (var line in lines)
                 {
-                    var entry = ParseLogLine(line);
+                    lineNumber++;
+                    var entry = ParseLogLine(line, lineNumber);
                     if (entry != null)
                     {
                         entries.Add(entry);
@@ -147,6 +180,8 @@ namespace FolderWatcherWindowsServiceAdmin.Services
                         break;
                     }
                 }
+
+                System.Diagnostics.Debug.WriteLine($"Parsed {entries.Count} entries from last {lines.Count} lines");
             }
             catch (Exception ex)
             {
@@ -157,71 +192,158 @@ namespace FolderWatcherWindowsServiceAdmin.Services
         }
 
         /// <summary>
-        /// Parse a single log line into a LogEntry with optimized string handling.
+        /// Parse a single log line into a LogEntry with SIMPLIFIED logic.
+        /// FIXED: Uses simple string search instead of complex regex.
         /// </summary>
-        private LogEntry ParseLogLine(string line)
+        private LogEntry ParseLogLine(string line, int lineNumber = 0)
         {
             if (string.IsNullOrWhiteSpace(line))
             {
                 return null;
             }
 
-            var match = _logLinePattern.Match(line);
-            if (!match.Success)
+            // Skip CSV header line
+            if (line.TrimStart().StartsWith("Timestamp,ChangeType", StringComparison.OrdinalIgnoreCase))
             {
                 return null;
             }
 
-            var logLevel = match.Groups[1].Value;
-            var timestampStr = match.Groups[2].Value;
-            var message = match.Groups[3].Value;
-
-            // Quick checks to skip non-CSV messages
-            if (message.Length < 20 || !message.Contains(',') || message.StartsWith("Service", StringComparison.OrdinalIgnoreCase))
+            // Quick check: must contain a log level and commas (CSV data)
+            var hasLogLevel = line.Contains("INFO") || line.Contains("ERROR") || line.Contains("DEBUG") || line.Contains("WARN");
+            if (!hasLogLevel || !line.Contains(','))
             {
                 return null;
             }
 
-            // Parse timestamp with optimized parsing
-            if (!TryParseTimestamp(timestampStr, out DateTime timestamp))
+            // Extract log level (first occurrence)
+            string logLevel = "INFO";
+            if (line.Contains("ERROR")) logLevel = "ERROR";
+            else if (line.Contains("WARN")) logLevel = "WARN";
+            else if (line.Contains("DEBUG")) logLevel = "DEBUG";
+
+            // Find the CSV data - it starts with a timestamp in format YYYY-MM-DD HH:MM:SS
+            var csvStartPattern = new Regex(@"(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}[.,]\d{3}),");
+            var csvMatch = csvStartPattern.Match(line);
+
+            if (!csvMatch.Success)
             {
                 return null;
             }
 
-            // Parse CSV message with optimized CSV parser
-            var csvFields = ParseCsvLineOptimized(message);
-            if (csvFields.Count < 11) // Should have at least 11 fields
+            // Extract the CSV portion (from the timestamp match to end of line)
+            var csvData = line.Substring(csvMatch.Index);
+
+            // Also extract the log4net timestamp (earlier in the line, before CSV data)
+            DateTime logTimestamp = DateTime.Now;
+            var logTimestampPattern = new Regex(@"(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}[.,]\d{3})");
+            var logTimestampMatch = logTimestampPattern.Match(line, 0, csvMatch.Index);
+            if (logTimestampMatch.Success)
             {
-                return null;
+                TryParseTimestamp(logTimestampMatch.Groups[1].Value, out logTimestamp);
             }
 
-            // Debug: Log some parsing details for first few entries
-            var debugCount = System.Threading.Interlocked.Increment(ref _debugEntryCount);
-            if (debugCount <= 5)
+            // Parse CSV data
+            List<string> csvFields;
+            try
             {
-                System.Diagnostics.Debug.WriteLine($"ParseLogLine #{debugCount}: LogLevel={logLevel}, CSV fields={csvFields.Count}");
-                System.Diagnostics.Debug.WriteLine($"  Error field (index 10): '{(csvFields.Count > 10 ? csvFields[10] : "N/A")}'");
-                System.Diagnostics.Debug.WriteLine($"  ChangeType field (index 1): '{(csvFields.Count > 1 ? csvFields[1] : "N/A")}'");
+                csvFields = ParseCsvLineOptimized(csvData);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Line {lineNumber}: CSV parsing error: {ex.Message}");
+                return new LogEntry
+                {
+                    LogLevel = "ERROR",
+                    Timestamp = logTimestamp,
+                    ChangeType = "ParseError",
+                    FileType = "Error",
+                    Error = $"CSV Parse Error: {ex.Message}",
+                    RawLine = line
+                };
             }
 
-            var entry = new LogEntry
+            // Validate field count
+            if (csvFields.Count < ExpectedCsvFieldCount)
+            {
+                var debugCount = System.Threading.Interlocked.Increment(ref _debugEntryCount);
+                if (debugCount <= 10)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Line {lineNumber}: Insufficient CSV fields. Expected {ExpectedCsvFieldCount}, got {csvFields.Count}");
+                    System.Diagnostics.Debug.WriteLine($"  CSV Data: {csvData.Substring(0, Math.Min(200, csvData.Length))}");
+                }
+
+                return CreatePartialEntry(logLevel, logTimestamp, csvFields, line,
+                    $"Incomplete CSV: Expected {ExpectedCsvFieldCount} fields, got {csvFields.Count}");
+            }
+
+            // Parse CSV timestamp (first field)
+            DateTime csvTimestamp = logTimestamp;
+            if (!string.IsNullOrWhiteSpace(csvFields[0]))
+            {
+                if (!TryParseTimestamp(csvFields[0], out csvTimestamp))
+                {
+                    csvTimestamp = logTimestamp;
+                }
+            }
+
+            // Debug: Log first few successful parses
+            var debugCounter = System.Threading.Interlocked.Increment(ref _debugEntryCount);
+            if (debugCounter <= 3)
+            {
+                System.Diagnostics.Debug.WriteLine($"✓ ParseLogLine #{debugCounter} (Line {lineNumber}): LogLevel={logLevel}, CSV fields={csvFields.Count}");
+                System.Diagnostics.Debug.WriteLine($"  Timestamp: {csvTimestamp:yyyy-MM-dd HH:mm:ss.fff}");
+                System.Diagnostics.Debug.WriteLine($"  ChangeType: '{csvFields[1]}'");
+                System.Diagnostics.Debug.WriteLine($"  FilePath: '{csvFields[2]}'");
+            }
+
+            // Create log entry with all fields
+            return new LogEntry
             {
                 LogLevel = logLevel,
-                Timestamp = TryParseTimestamp(csvFields[0], out DateTime csvTimestamp) ? csvTimestamp : timestamp,
-                ChangeType = csvFields.Count > 1 ? csvFields[1] : string.Empty,
-                FilePath = csvFields.Count > 2 ? csvFields[2] : string.Empty,
-                ServiceUser = csvFields.Count > 3 ? csvFields[3] : string.Empty,
-                ModifiedBy = csvFields.Count > 4 ? csvFields[4] : string.Empty,
-                FileType = csvFields.Count > 5 ? csvFields[5] : string.Empty,
-                FileSize = csvFields.Count > 6 ? csvFields[6] : string.Empty,
-                Extension = csvFields.Count > 7 ? csvFields[7] : string.Empty,
-                LastAccessed = csvFields.Count > 8 ? csvFields[8] : string.Empty,
-                LastModified = csvFields.Count > 9 ? csvFields[9] : string.Empty,
-                Error = csvFields.Count > 10 ? csvFields[10].Trim() : string.Empty, // Trim whitespace from error field
+                Timestamp = csvTimestamp,
+                ChangeType = GetField(csvFields, 1),
+                FilePath = GetField(csvFields, 2),
+                ServiceUser = GetField(csvFields, 3),
+                ModifiedBy = GetField(csvFields, 4),
+                FileType = GetField(csvFields, 5),
+                FileSize = GetField(csvFields, 6),
+                Extension = GetField(csvFields, 7),
+                LastAccessed = GetField(csvFields, 8),
+                LastModified = GetField(csvFields, 9),
+                Error = GetField(csvFields, 10).Trim(),
                 RawLine = line
             };
+        }
 
-            return entry;
+        /// <summary>
+        /// Safely get a CSV field by index with bounds checking.
+        /// </summary>
+        private string GetField(List<string> fields, int index)
+        {
+            return index < fields.Count ? fields[index] : string.Empty;
+        }
+
+        /// <summary>
+        /// Create a partial log entry when CSV parsing fails or is incomplete.
+        /// </summary>
+        private LogEntry CreatePartialEntry(string logLevel, DateTime timestamp, List<string> csvFields, string rawLine, string errorMessage)
+        {
+            return new LogEntry
+            {
+                LogLevel = logLevel,
+                Timestamp = timestamp,
+                ChangeType = GetField(csvFields, 1),
+                FilePath = GetField(csvFields, 2),
+                ServiceUser = GetField(csvFields, 3),
+                ModifiedBy = GetField(csvFields, 4),
+                FileType = "Error",
+                FileSize = GetField(csvFields, 6),
+                Extension = GetField(csvFields, 7),
+                LastAccessed = GetField(csvFields, 8),
+                LastModified = GetField(csvFields, 9),
+                Error = errorMessage,
+                RawLine = rawLine
+            };
         }
 
         /// <summary>
@@ -229,31 +351,52 @@ namespace FolderWatcherWindowsServiceAdmin.Services
         /// </summary>
         private bool TryParseTimestamp(string timestampStr, out DateTime timestamp)
         {
-            // Try the most common format first
-            if (DateTime.TryParseExact(timestampStr, "yyyy-MM-dd HH:mm:ss,fff", 
-                CultureInfo.InvariantCulture, DateTimeStyles.None, out timestamp))
+            if (string.IsNullOrWhiteSpace(timestampStr))
+            {
+                timestamp = DateTime.MinValue;
+                return false;
+            }
+
+            // Normalize timestamp string
+            var normalizedStr = timestampStr.Replace(',', '.');
+
+            // Try common formats
+            string[] formats = new[]
+            {
+                "yyyy-MM-dd HH:mm:ss.fff",
+                "yyyy-MM-dd HH:mm:ss,fff",
+                "yyyy-MM-dd HH:mm:ss",
+                "M/d/yyyy H:mm",
+                "M/d/yyyy H:mm:ss",
+            };
+
+            foreach (var format in formats)
+            {
+                if (DateTime.TryParseExact(normalizedStr, format,
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out timestamp))
+                {
+                    return true;
+                }
+            }
+
+            // Fallback
+            if (DateTime.TryParse(timestampStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out timestamp))
             {
                 return true;
             }
 
-            // Try alternative format
-            if (DateTime.TryParseExact(timestampStr, "yyyy-MM-dd HH:mm:ss.fff", 
-                CultureInfo.InvariantCulture, DateTimeStyles.None, out timestamp))
-            {
-                return true;
-            }
-
-            // Fallback to general parsing
-            return DateTime.TryParse(timestampStr, out timestamp);
+            timestamp = DateTime.MinValue;
+            return false;
         }
 
         /// <summary>
         /// Optimized CSV line parser using StringBuilder for better memory efficiency.
+        /// Handles quoted fields, escaped quotes, and embedded commas correctly.
         /// </summary>
         private List<string> ParseCsvLineOptimized(string line)
         {
             var fields = new List<string>();
-            var fieldBuilder = new StringBuilder();
+            var fieldBuilder = new StringBuilder(256);
             var inQuotes = false;
             var i = 0;
 
@@ -265,20 +408,17 @@ namespace FolderWatcherWindowsServiceAdmin.Services
                 {
                     if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
                     {
-                        // Escaped quote
                         fieldBuilder.Append('"');
                         i += 2;
                     }
                     else
                     {
-                        // Toggle quote state
                         inQuotes = !inQuotes;
                         i++;
                     }
                 }
                 else if (ch == ',' && !inQuotes)
                 {
-                    // Field separator
                     fields.Add(fieldBuilder.ToString());
                     fieldBuilder.Clear();
                     i++;
@@ -290,9 +430,7 @@ namespace FolderWatcherWindowsServiceAdmin.Services
                 }
             }
 
-            // Add the last field
             fields.Add(fieldBuilder.ToString());
-
             return fields;
         }
 
@@ -301,7 +439,7 @@ namespace FolderWatcherWindowsServiceAdmin.Services
         /// </summary>
         private List<string> ReadLastLinesOptimized(string filePath, int lineCount)
         {
-            const int bufferSize = 16384; // 16KB buffer for better performance
+            const int bufferSize = 16384;
             var lines = new List<string>();
 
             using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize))
@@ -312,7 +450,7 @@ namespace FolderWatcherWindowsServiceAdmin.Services
                 }
 
                 var buffer = new byte[bufferSize];
-                var lineBytes = new List<byte>();
+                var lineBytes = new List<byte>(1024);
                 var position = fileStream.Length;
                 var foundLines = new List<string>();
 
@@ -323,14 +461,12 @@ namespace FolderWatcherWindowsServiceAdmin.Services
                     fileStream.Seek(position, SeekOrigin.Begin);
                     var bytesRead = fileStream.Read(buffer, 0, bytesToRead);
 
-                    // Process bytes in reverse order
                     for (int i = bytesRead - 1; i >= 0; i--)
                     {
                         if (buffer[i] == '\n')
                         {
                             if (lineBytes.Count > 0)
                             {
-                                // Convert line buffer to string (reverse it first)
                                 lineBytes.Reverse();
                                 var lineText = Encoding.UTF8.GetString(lineBytes.ToArray()).TrimEnd('\r');
                                 if (!string.IsNullOrWhiteSpace(lineText))
@@ -352,7 +488,6 @@ namespace FolderWatcherWindowsServiceAdmin.Services
                     }
                 }
 
-                // Handle any remaining content in the line buffer
                 if (lineBytes.Count > 0 && foundLines.Count < lineCount)
                 {
                     lineBytes.Reverse();
@@ -363,106 +498,48 @@ namespace FolderWatcherWindowsServiceAdmin.Services
                     }
                 }
 
-                // Reverse to get chronological order (oldest first)
                 foundLines.Reverse();
                 return foundLines;
             }
         }
 
-        /// <summary>
-        /// Asynchronous version for non-blocking UI operations.
-        /// </summary>
         public async Task<List<LogEntry>> ParseLogFileAsync()
         {
             return await Task.Run(() => ParseLogFile()).ConfigureAwait(false);
         }
 
-        /// <summary>
-        /// Asynchronous version for parsing last entries.
-        /// </summary>
         public async Task<List<LogEntry>> ParseLastEntriesAsync(int count)
         {
             return await Task.Run(() => ParseLastEntries(count)).ConfigureAwait(false);
         }
 
-        /// <summary>
-        /// Generate summary statistics from log entries with optimized LINQ.
-        /// </summary>
         public LogSummary GenerateSummary(IEnumerable<LogEntry> entries)
         {
             var entriesList = entries as List<LogEntry> ?? entries.ToList();
-            
+
             if (!entriesList.Any())
             {
-                return new LogSummary
-                {
-                    TotalRecords = 0,
-                    RecentActivityCount = 0,
-                    ErrorCount = 0,
-                    CreatedCount = 0,
-                    ModifiedCount = 0,
-                    DeletedCount = 0,
-                    RenamedCount = 0,
-                    LastUpdate = null
-                };
+                return new LogSummary();
             }
 
             var now = DateTime.Now;
-            var recentThreshold = now.AddMinutes(-30); // Last 30 minutes
+            var recentThreshold = now.AddMinutes(-30);
 
-            // Use parallel processing for large datasets
             if (entriesList.Count > 1000)
             {
                 return GenerateSummaryParallel(entriesList, recentThreshold, now);
             }
 
-            // Debug: Log some info about the calculation
-            System.Diagnostics.Debug.WriteLine($"GenerateSummary: Total entries = {entriesList.Count}");
-            System.Diagnostics.Debug.WriteLine($"GenerateSummary: Current time = {now:yyyy-MM-dd HH:mm:ss}");
-            System.Diagnostics.Debug.WriteLine($"GenerateSummary: Recent threshold = {recentThreshold:yyyy-MM-dd HH:mm:ss}");
-            
-            // Count entries with actual errors - be more specific about what constitutes an error
-            // An error is either:
-            // 1. Has non-empty Error field content (actual error message)
-            // 2. Has LogLevel of ERROR (but only if Error field is empty to avoid double counting)
-            var errorCount = 0;
-            var entriesWithErrorField = 0;
-            var entriesWithErrorLogLevel = 0;
-            
-            foreach (var entry in entriesList)
-            {
-                var hasErrorField = !string.IsNullOrWhiteSpace(entry.Error);
-                var hasErrorLogLevel = entry.LogLevel.Equals("ERROR", StringComparison.OrdinalIgnoreCase);
-                
-                if (hasErrorField)
-                {
-                    entriesWithErrorField++;
-                    errorCount++;
-                }
-                else if (hasErrorLogLevel)
-                {
-                    entriesWithErrorLogLevel++;
-                    errorCount++;
-                }
-            }
+            var unknownCount = entriesList.Count(e => e.FileType.Equals("Unknown", StringComparison.OrdinalIgnoreCase));
 
-            // Count recent activity based on entry timestamps
             var recentActivityCount = entriesList.Count(e => e.Timestamp >= recentThreshold);
-            
-            // Get last update time
             var lastUpdate = entriesList.Max(e => e.Timestamp);
-
-            System.Diagnostics.Debug.WriteLine($"GenerateSummary: Entries with Error field = {entriesWithErrorField}");
-            System.Diagnostics.Debug.WriteLine($"GenerateSummary: Entries with ERROR LogLevel (no Error field) = {entriesWithErrorLogLevel}");
-            System.Diagnostics.Debug.WriteLine($"GenerateSummary: Total error count = {errorCount}");
-            System.Diagnostics.Debug.WriteLine($"GenerateSummary: Recent activity count = {recentActivityCount}");
-            System.Diagnostics.Debug.WriteLine($"GenerateSummary: Last update = {lastUpdate:yyyy-MM-dd HH:mm:ss}");
 
             return new LogSummary
             {
                 TotalRecords = entriesList.Count,
                 RecentActivityCount = recentActivityCount,
-                ErrorCount = errorCount,
+                UnknownCount = unknownCount,
                 CreatedCount = entriesList.Count(e => e.ChangeType.Equals("Created", StringComparison.OrdinalIgnoreCase)),
                 ModifiedCount = entriesList.Count(e => e.ChangeType.Equals("Changed", StringComparison.OrdinalIgnoreCase)),
                 DeletedCount = entriesList.Count(e => e.ChangeType.Equals("Deleted", StringComparison.OrdinalIgnoreCase)),
@@ -471,39 +548,20 @@ namespace FolderWatcherWindowsServiceAdmin.Services
             };
         }
 
-        /// <summary>
-        /// Generate summary using parallel processing for large datasets.
-        /// </summary>
         private LogSummary GenerateSummaryParallel(List<LogEntry> entries, DateTime recentThreshold, DateTime now)
         {
             var parallelQuery = entries.AsParallel();
 
-            // Debug: Log some info about the calculation
-            System.Diagnostics.Debug.WriteLine($"GenerateSummaryParallel: Total entries = {entries.Count}");
-            System.Diagnostics.Debug.WriteLine($"GenerateSummaryParallel: Current time = {now:yyyy-MM-dd HH:mm:ss}");
-            System.Diagnostics.Debug.WriteLine($"GenerateSummaryParallel: Recent threshold = {recentThreshold:yyyy-MM-dd HH:mm:ss}");
+            var errorCount = parallelQuery.Count(e => e.FileType.Equals("Unknown", StringComparison.OrdinalIgnoreCase));
 
-            // Count entries with actual errors - be more specific about what constitutes an error
-            var errorEntries = parallelQuery.Where(e => 
-                !string.IsNullOrWhiteSpace(e.Error) || 
-                (string.IsNullOrWhiteSpace(e.Error) && e.LogLevel.Equals("ERROR", StringComparison.OrdinalIgnoreCase))
-            ).ToList();
-
-            // Count recent activity based on entry timestamps
             var recentActivityCount = parallelQuery.Count(e => e.Timestamp >= recentThreshold);
-            
-            // Get last update time
             var lastUpdate = parallelQuery.Max(e => e.Timestamp);
-
-            System.Diagnostics.Debug.WriteLine($"GenerateSummaryParallel: Error count = {errorEntries.Count}");
-            System.Diagnostics.Debug.WriteLine($"GenerateSummaryParallel: Recent activity count = {recentActivityCount}");
-            System.Diagnostics.Debug.WriteLine($"GenerateSummaryParallel: Last update = {lastUpdate:yyyy-MM-dd HH:mm:ss}");
 
             return new LogSummary
             {
                 TotalRecords = entries.Count,
                 RecentActivityCount = recentActivityCount,
-                ErrorCount = errorEntries.Count,
+                UnknownCount = errorCount,
                 CreatedCount = parallelQuery.Count(e => e.ChangeType.Equals("Created", StringComparison.OrdinalIgnoreCase)),
                 ModifiedCount = parallelQuery.Count(e => e.ChangeType.Equals("Changed", StringComparison.OrdinalIgnoreCase)),
                 DeletedCount = parallelQuery.Count(e => e.ChangeType.Equals("Deleted", StringComparison.OrdinalIgnoreCase)),
@@ -512,10 +570,6 @@ namespace FolderWatcherWindowsServiceAdmin.Services
             };
         }
 
-        /// <summary>
-        /// Diagnostic method to analyze the first few lines of the log file.
-        /// This helps identify parsing issues and data format problems.
-        /// </summary>
         public void DiagnoseLogFile()
         {
             if (!File.Exists(_logFilePath))
@@ -526,16 +580,18 @@ namespace FolderWatcherWindowsServiceAdmin.Services
 
             try
             {
-                System.Diagnostics.Debug.WriteLine($"DiagnoseLogFile: Analyzing {_logFilePath}");
-                
+                System.Diagnostics.Debug.WriteLine($"\n{new string('=', 80)}");
+                System.Diagnostics.Debug.WriteLine($"DiagnoseLogFile: {_logFilePath}");
+                System.Diagnostics.Debug.WriteLine(new string('=', 80));
+
                 var fileInfo = new FileInfo(_logFilePath);
                 System.Diagnostics.Debug.WriteLine($"File size: {fileInfo.Length:N0} bytes");
                 System.Diagnostics.Debug.WriteLine($"Last modified: {fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}");
+                System.Diagnostics.Debug.WriteLine(new string('-', 80));
 
-                // Read first 10 lines
                 var lines = new List<string>();
-                using (var fileStream = new FileStream(_logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                using (var reader = new StreamReader(fileStream))
+                using (var fs = new FileStream(_logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var reader = new StreamReader(fs))
                 {
                     for (int i = 0; i < 10 && !reader.EndOfStream; i++)
                     {
@@ -543,42 +599,25 @@ namespace FolderWatcherWindowsServiceAdmin.Services
                     }
                 }
 
-                System.Diagnostics.Debug.WriteLine($"First {lines.Count} lines:");
                 for (int i = 0; i < lines.Count; i++)
                 {
                     var line = lines[i];
-                    System.Diagnostics.Debug.WriteLine($"Line {i + 1}: {line}");
-                    
-                    // Try to parse this line
-                    var match = _logLinePattern.Match(line);
-                    if (match.Success)
+                    System.Diagnostics.Debug.WriteLine($"\n[Line {i + 1}]");
+                    System.Diagnostics.Debug.WriteLine($"Length: {line.Length}");
+                    System.Diagnostics.Debug.WriteLine($"Content: {line.Substring(0, Math.Min(150, line.Length))}...");
+
+                    var entry = ParseLogLine(line, i + 1);
+                    if (entry != null)
                     {
-                        var logLevel = match.Groups[1].Value;
-                        var timestampStr = match.Groups[2].Value;
-                        var message = match.Groups[3].Value;
-                        
-                        System.Diagnostics.Debug.WriteLine($"  -> Parsed: LogLevel={logLevel}, Timestamp={timestampStr}");
-                        System.Diagnostics.Debug.WriteLine($"  -> Message length: {message.Length}, Contains comma: {message.Contains(',')}");
-                        
-                        if (message.Contains(','))
-                        {
-                            var csvFields = ParseCsvLineOptimized(message);
-                            System.Diagnostics.Debug.WriteLine($"  -> CSV fields count: {csvFields.Count}");
-                            if (csvFields.Count > 10)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"  -> Error field (index 10): '{csvFields[10]}'");
-                            }
-                            if (csvFields.Count > 1)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"  -> ChangeType field (index 1): '{csvFields[1]}'");
-                            }
-                        }
+                        System.Diagnostics.Debug.WriteLine($"✓ PARSED: LogLevel={entry.LogLevel}, ChangeType={entry.ChangeType}, FileType={entry.FileType}");
                     }
                     else
                     {
-                        System.Diagnostics.Debug.WriteLine($"  -> Does not match log pattern");
+                        System.Diagnostics.Debug.WriteLine($"✗ SKIPPED");
                     }
                 }
+
+                System.Diagnostics.Debug.WriteLine(new string('=', 80) + "\n");
             }
             catch (Exception ex)
             {

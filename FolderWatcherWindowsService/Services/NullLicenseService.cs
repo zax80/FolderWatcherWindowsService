@@ -11,7 +11,7 @@ namespace FolderWatcherWindowsService.Services
     {
         public bool Initialize() => true;
 
-        public LicenseInfoResult GetLicenseInfo()
+        public object GetLicenseInfo()
         {
             return new LicenseInfoResult
             {

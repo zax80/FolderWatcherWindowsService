@@ -1,7 +1,11 @@
 ﻿using FolderWatcherWindowsService.Common.Interfaces;
+
+using FolderWatcherWindowsServiceAdmin.Controls;
+using log4net;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -10,6 +14,10 @@ using System.ServiceProcess;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+
+#if PREMIUM
+using FolderWatcherWindowsService.ThreatDetection.Services;
+#endif
 
 namespace FolderWatcherWindowsServiceAdmin
 {
@@ -46,6 +54,15 @@ namespace FolderWatcherWindowsServiceAdmin
 #if PREMIUM
         // License management
         private ILicenseService _licenseService;
+
+        // AI Control
+        private AiAssistantControl aiAssistantControl;
+
+        // Threat Detection Service
+        private ThreatDetectionService _threatDetectionService;
+
+        // Logger
+        private ILog _logger;
 #endif
 
         public FolderWatcherWindowsServiceAdmin()
@@ -60,6 +77,8 @@ namespace FolderWatcherWindowsServiceAdmin
 
             // CRITICAL FIX: Initialize layout for both FREE and PREMIUM
             InitializeFormLayout();
+
+
         }
 
 #if PREMIUM
@@ -191,6 +210,46 @@ namespace FolderWatcherWindowsServiceAdmin
             // Show trial reminder on startup if in trial mode
             ShowTrialReminderOnStartup();
         }
+
+        private void InitializeAITab()
+        {
+            // Create AI Assistant tab
+            var tabAI = new TabPage("AI Assistant 🤖");
+
+            aiAssistantControl = new AiAssistantControl
+            {
+                Dock = DockStyle.Fill
+            };
+
+            tabAI.Controls.Add(aiAssistantControl);
+            tabControl1.TabPages.Add(tabAI);
+
+            // Initialize threat service
+            InitializeThreatService();
+        }
+
+        private void InitializeThreatService()
+        {
+            try
+            {
+                var logger = LogManager.GetLogger(typeof(FolderWatcherWindowsServiceAdmin));
+                //_threatDetectionService = new ThreatDetectionService(logger);
+
+                if (_threatDetectionService.Initialize())
+                {
+                    //aiAssistantControl.SetThreatService(_threatDetectionService);
+                    //logViewerControl.SetThreatService(_threatDetectionService);
+
+                    _logger?.Info("Threat detection service initialized for Admin UI");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.Error($"Failed to initialize threat service: {ex.Message}", ex);
+                MessageBox.Show("AI features may not be available. Check configuration.",
+                    "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
 #endif
 
         /// <summary>
@@ -202,6 +261,8 @@ namespace FolderWatcherWindowsServiceAdmin
             System.Diagnostics.Debug.WriteLine("InitializeFormLayout: Starting layout initialization");
             
             AdjustFormLayout(null);
+
+            CheckPermissions();
         }
 
         /// <summary>
@@ -2320,6 +2381,12 @@ namespace FolderWatcherWindowsServiceAdmin
             InitializeFolderManagement();
             RefreshFoldersList();
             UpdateUI();
+
+            // Set the configuration file path
+            lblConfigPathValue.Text = folderManager.ConfigFilePath;
+#if PREMIUM
+            InitializeAITab();
+#endif
         }
     }
 }

@@ -28,6 +28,7 @@ namespace FolderWatcherWindowsServiceAdmin
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FolderWatcherWindowsServiceAdmin));
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPageService = new System.Windows.Forms.TabPage();
             this.groupBoxFolders = new System.Windows.Forms.GroupBox();
@@ -43,7 +44,7 @@ namespace FolderWatcherWindowsServiceAdmin
             this.btnAlertConfig = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
             this.tabPageLogs = new System.Windows.Forms.TabPage();
-            this.logViewerControl = new global::FolderWatcherWindowsServiceAdmin.Controls.LogViewerControl();
+            this.logViewerControl = new Controls.LogViewerControl();
             this.tabControl1.SuspendLayout();
             this.tabPageService.SuspendLayout();
             this.groupBoxFolders.SuspendLayout();
@@ -97,7 +98,6 @@ namespace FolderWatcherWindowsServiceAdmin
             this.listBoxFolders.Location = new System.Drawing.Point(9, 45);
             this.listBoxFolders.Margin = new System.Windows.Forms.Padding(2);
             this.listBoxFolders.Name = "listBoxFolders";
-            this.listBoxFolders.SelectionMode = System.Windows.Forms.SelectionMode.One;
             this.listBoxFolders.Size = new System.Drawing.Size(1158, 472);
             this.listBoxFolders.TabIndex = 0;
             this.listBoxFolders.SelectedIndexChanged += new System.EventHandler(this.listBoxFolders_SelectedIndexChanged);
@@ -143,7 +143,7 @@ namespace FolderWatcherWindowsServiceAdmin
             this.lblConfigPath.Location = new System.Drawing.Point(9, 18);
             this.lblConfigPath.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
             this.lblConfigPath.Name = "lblConfigPath";
-            this.lblConfigPath.Size = new System.Drawing.Size(94, 13);
+            this.lblConfigPath.Size = new System.Drawing.Size(91, 13);
             this.lblConfigPath.TabIndex = 4;
             this.lblConfigPath.Text = "Configuration File:";
             // 
@@ -195,6 +195,7 @@ namespace FolderWatcherWindowsServiceAdmin
             // 
             // btnAlertConfig
             // 
+            this.btnAlertConfig.Enabled = false;
             this.btnAlertConfig.Location = new System.Drawing.Point(89, 41);
             this.btnAlertConfig.Margin = new System.Windows.Forms.Padding(2);
             this.btnAlertConfig.Name = "btnAlertConfig";
@@ -202,12 +203,7 @@ namespace FolderWatcherWindowsServiceAdmin
             this.btnAlertConfig.TabIndex = 3;
             this.btnAlertConfig.Text = "Alert Settings...";
             this.btnAlertConfig.UseVisualStyleBackColor = true;
-#if PREMIUM
-            this.btnAlertConfig.Click += new System.EventHandler(this.btnAlertConfig_Click);
-#else
-            this.btnAlertConfig.Enabled = false;
             this.btnAlertConfig.Visible = false;
-#endif
             // 
             // lblStatus
             // 
@@ -244,6 +240,7 @@ namespace FolderWatcherWindowsServiceAdmin
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1200, 700);
             this.Controls.Add(this.tabControl1);
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(2);
             this.MinimumSize = new System.Drawing.Size(1000, 600);
             this.Name = "FolderWatcherWindowsServiceAdmin";

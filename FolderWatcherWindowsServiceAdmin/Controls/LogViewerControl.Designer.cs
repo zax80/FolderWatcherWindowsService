@@ -1,4 +1,4 @@
-namespace FolderWatcherWindowsServiceAdmin.Controls
+﻿namespace FolderWatcherWindowsServiceAdmin.Controls
 {
     partial class LogViewerControl
     {
@@ -20,7 +20,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.tableLayoutPanelSummary = new System.Windows.Forms.TableLayoutPanel();
             this.lblTotalRecords = new System.Windows.Forms.Label();
             this.lblRecentActivity = new System.Windows.Forms.Label();
-            this.lblErrorCount = new System.Windows.Forms.Label();
+            this.lblUnknownCount = new System.Windows.Forms.Label();
             this.lblCreated = new System.Windows.Forms.Label();
             this.lblModified = new System.Windows.Forms.Label();
             this.lblDeleted = new System.Windows.Forms.Label();
@@ -41,8 +41,8 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.panelMain = new System.Windows.Forms.Panel();
             this.dataGridViewLogs = new System.Windows.Forms.DataGridView();
             this.panelBottom = new System.Windows.Forms.Panel();
-            this.lblStatus = new System.Windows.Forms.Label();
             this.lblLogPath = new System.Windows.Forms.Label();
+            this.lblStatus = new System.Windows.Forms.Label();
             this.panelPagination = new System.Windows.Forms.Panel();
             this.btnRefresh = new System.Windows.Forms.Button();
             this.btnNextPage = new System.Windows.Forms.Button();
@@ -68,16 +68,16 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.panelTop.Dock = System.Windows.Forms.DockStyle.Top;
             this.panelTop.Location = new System.Drawing.Point(0, 0);
             this.panelTop.Name = "panelTop";
-            this.panelTop.Size = new System.Drawing.Size(1200, 140);
+            this.panelTop.Size = new System.Drawing.Size(1186, 150);
             this.panelTop.TabIndex = 0;
             // 
             // groupBoxSummary
             // 
             this.groupBoxSummary.Controls.Add(this.tableLayoutPanelSummary);
             this.groupBoxSummary.Dock = System.Windows.Forms.DockStyle.Right;
-            this.groupBoxSummary.Location = new System.Drawing.Point(700, 0);
+            this.groupBoxSummary.Location = new System.Drawing.Point(686, 0);
             this.groupBoxSummary.Name = "groupBoxSummary";
-            this.groupBoxSummary.Size = new System.Drawing.Size(500, 140);
+            this.groupBoxSummary.Size = new System.Drawing.Size(500, 150);
             this.groupBoxSummary.TabIndex = 1;
             this.groupBoxSummary.TabStop = false;
             this.groupBoxSummary.Text = "Summary";
@@ -89,7 +89,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.tableLayoutPanelSummary.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 50F));
             this.tableLayoutPanelSummary.Controls.Add(this.lblTotalRecords, 0, 0);
             this.tableLayoutPanelSummary.Controls.Add(this.lblRecentActivity, 1, 0);
-            this.tableLayoutPanelSummary.Controls.Add(this.lblErrorCount, 0, 1);
+            this.tableLayoutPanelSummary.Controls.Add(this.lblUnknownCount, 0, 1);
             this.tableLayoutPanelSummary.Controls.Add(this.lblCreated, 1, 1);
             this.tableLayoutPanelSummary.Controls.Add(this.lblModified, 0, 2);
             this.tableLayoutPanelSummary.Controls.Add(this.lblDeleted, 1, 2);
@@ -103,7 +103,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.tableLayoutPanelSummary.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
             this.tableLayoutPanelSummary.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
             this.tableLayoutPanelSummary.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanelSummary.Size = new System.Drawing.Size(494, 121);
+            this.tableLayoutPanelSummary.Size = new System.Drawing.Size(494, 131);
             this.tableLayoutPanelSummary.TabIndex = 0;
             // 
             // lblTotalRecords
@@ -112,7 +112,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.lblTotalRecords.Dock = System.Windows.Forms.DockStyle.Fill;
             this.lblTotalRecords.Location = new System.Drawing.Point(3, 0);
             this.lblTotalRecords.Name = "lblTotalRecords";
-            this.lblTotalRecords.Size = new System.Drawing.Size(241, 30);
+            this.lblTotalRecords.Size = new System.Drawing.Size(241, 32);
             this.lblTotalRecords.TabIndex = 0;
             this.lblTotalRecords.Text = "Total Records: 0";
             this.lblTotalRecords.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -123,31 +123,31 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.lblRecentActivity.Dock = System.Windows.Forms.DockStyle.Fill;
             this.lblRecentActivity.Location = new System.Drawing.Point(250, 0);
             this.lblRecentActivity.Name = "lblRecentActivity";
-            this.lblRecentActivity.Size = new System.Drawing.Size(241, 30);
+            this.lblRecentActivity.Size = new System.Drawing.Size(241, 32);
             this.lblRecentActivity.TabIndex = 1;
             this.lblRecentActivity.Text = "Recent Activity (30m): 0";
             this.lblRecentActivity.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
-            // lblErrorCount
+            // lblUnknownCount
             // 
-            this.lblErrorCount.AutoSize = true;
-            this.lblErrorCount.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblErrorCount.ForeColor = System.Drawing.Color.Red;
-            this.lblErrorCount.Location = new System.Drawing.Point(3, 30);
-            this.lblErrorCount.Name = "lblErrorCount";
-            this.lblErrorCount.Size = new System.Drawing.Size(241, 30);
-            this.lblErrorCount.TabIndex = 2;
-            this.lblErrorCount.Text = "Errors: 0";
-            this.lblErrorCount.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.lblUnknownCount.AutoSize = true;
+            this.lblUnknownCount.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lblUnknownCount.ForeColor = System.Drawing.Color.Red;
+            this.lblUnknownCount.Location = new System.Drawing.Point(3, 32);
+            this.lblUnknownCount.Name = "lblUnknownCount";
+            this.lblUnknownCount.Size = new System.Drawing.Size(241, 32);
+            this.lblUnknownCount.TabIndex = 2;
+            this.lblUnknownCount.Text = "Unknowns: 0";
+            this.lblUnknownCount.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // lblCreated
             // 
             this.lblCreated.AutoSize = true;
             this.lblCreated.Dock = System.Windows.Forms.DockStyle.Fill;
             this.lblCreated.ForeColor = System.Drawing.Color.Green;
-            this.lblCreated.Location = new System.Drawing.Point(250, 30);
+            this.lblCreated.Location = new System.Drawing.Point(250, 32);
             this.lblCreated.Name = "lblCreated";
-            this.lblCreated.Size = new System.Drawing.Size(241, 30);
+            this.lblCreated.Size = new System.Drawing.Size(241, 32);
             this.lblCreated.TabIndex = 3;
             this.lblCreated.Text = "Created: 0";
             this.lblCreated.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -157,9 +157,9 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.lblModified.AutoSize = true;
             this.lblModified.Dock = System.Windows.Forms.DockStyle.Fill;
             this.lblModified.ForeColor = System.Drawing.Color.Blue;
-            this.lblModified.Location = new System.Drawing.Point(3, 60);
+            this.lblModified.Location = new System.Drawing.Point(3, 64);
             this.lblModified.Name = "lblModified";
-            this.lblModified.Size = new System.Drawing.Size(241, 30);
+            this.lblModified.Size = new System.Drawing.Size(241, 32);
             this.lblModified.TabIndex = 4;
             this.lblModified.Text = "Modified: 0";
             this.lblModified.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -169,9 +169,9 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.lblDeleted.AutoSize = true;
             this.lblDeleted.Dock = System.Windows.Forms.DockStyle.Fill;
             this.lblDeleted.ForeColor = System.Drawing.Color.OrangeRed;
-            this.lblDeleted.Location = new System.Drawing.Point(250, 60);
+            this.lblDeleted.Location = new System.Drawing.Point(250, 64);
             this.lblDeleted.Name = "lblDeleted";
-            this.lblDeleted.Size = new System.Drawing.Size(241, 30);
+            this.lblDeleted.Size = new System.Drawing.Size(241, 32);
             this.lblDeleted.TabIndex = 5;
             this.lblDeleted.Text = "Deleted: 0";
             this.lblDeleted.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -181,9 +181,9 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.lblRenamed.AutoSize = true;
             this.lblRenamed.Dock = System.Windows.Forms.DockStyle.Fill;
             this.lblRenamed.ForeColor = System.Drawing.Color.Purple;
-            this.lblRenamed.Location = new System.Drawing.Point(3, 90);
+            this.lblRenamed.Location = new System.Drawing.Point(3, 96);
             this.lblRenamed.Name = "lblRenamed";
-            this.lblRenamed.Size = new System.Drawing.Size(241, 31);
+            this.lblRenamed.Size = new System.Drawing.Size(241, 35);
             this.lblRenamed.TabIndex = 6;
             this.lblRenamed.Text = "Renamed: 0";
             this.lblRenamed.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -192,9 +192,9 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             // 
             this.lblLastUpdate.AutoSize = true;
             this.lblLastUpdate.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblLastUpdate.Location = new System.Drawing.Point(250, 90);
+            this.lblLastUpdate.Location = new System.Drawing.Point(250, 96);
             this.lblLastUpdate.Name = "lblLastUpdate";
-            this.lblLastUpdate.Size = new System.Drawing.Size(241, 31);
+            this.lblLastUpdate.Size = new System.Drawing.Size(241, 35);
             this.lblLastUpdate.TabIndex = 7;
             this.lblLastUpdate.Text = "Last Entry: None";
             this.lblLastUpdate.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -205,7 +205,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.groupBoxFilters.Dock = System.Windows.Forms.DockStyle.Fill;
             this.groupBoxFilters.Location = new System.Drawing.Point(0, 0);
             this.groupBoxFilters.Name = "groupBoxFilters";
-            this.groupBoxFilters.Size = new System.Drawing.Size(1200, 140);
+            this.groupBoxFilters.Size = new System.Drawing.Size(1186, 150);
             this.groupBoxFilters.TabIndex = 0;
             this.groupBoxFilters.TabStop = false;
             this.groupBoxFilters.Text = "Filters";
@@ -236,7 +236,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.tableLayoutPanelFilters.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
             this.tableLayoutPanelFilters.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
             this.tableLayoutPanelFilters.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.tableLayoutPanelFilters.Size = new System.Drawing.Size(1194, 121);
+            this.tableLayoutPanelFilters.Size = new System.Drawing.Size(1180, 131);
             this.tableLayoutPanelFilters.TabIndex = 0;
             // 
             // chkDateFilter
@@ -326,7 +326,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.btnApplyFilters.Dock = System.Windows.Forms.DockStyle.Left;
             this.btnApplyFilters.Location = new System.Drawing.Point(453, 63);
             this.btnApplyFilters.Name = "btnApplyFilters";
-            this.btnApplyFilters.Size = new System.Drawing.Size(94, 55);
+            this.btnApplyFilters.Size = new System.Drawing.Size(94, 65);
             this.btnApplyFilters.TabIndex = 10;
             this.btnApplyFilters.Text = "Apply filters";
             this.btnApplyFilters.UseVisualStyleBackColor = true;
@@ -337,7 +337,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.btnClearFilters.Dock = System.Windows.Forms.DockStyle.Left;
             this.btnClearFilters.Location = new System.Drawing.Point(353, 63);
             this.btnClearFilters.Name = "btnClearFilters";
-            this.btnClearFilters.Size = new System.Drawing.Size(94, 55);
+            this.btnClearFilters.Size = new System.Drawing.Size(94, 65);
             this.btnClearFilters.TabIndex = 11;
             this.btnClearFilters.Text = "Clear filters";
             this.btnClearFilters.UseVisualStyleBackColor = true;
@@ -347,9 +347,10 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             // 
             this.panelMain.Controls.Add(this.dataGridViewLogs);
             this.panelMain.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panelMain.Location = new System.Drawing.Point(0, 0);
+            this.panelMain.Location = new System.Drawing.Point(0, 150);
             this.panelMain.Name = "panelMain";
-            this.panelMain.Size = new System.Drawing.Size(1200, 600);
+            this.panelMain.Padding = new System.Windows.Forms.Padding(3);
+            this.panelMain.Size = new System.Drawing.Size(1186, 448);
             this.panelMain.TabIndex = 1;
             // 
             // dataGridViewLogs
@@ -358,31 +359,25 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.dataGridViewLogs.AllowUserToDeleteRows = false;
             this.dataGridViewLogs.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.dataGridViewLogs.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.dataGridViewLogs.Location = new System.Drawing.Point(0, 0);
+            this.dataGridViewLogs.Location = new System.Drawing.Point(3, 3);
+            this.dataGridViewLogs.MultiSelect = false;
             this.dataGridViewLogs.Name = "dataGridViewLogs";
             this.dataGridViewLogs.ReadOnly = true;
-            this.dataGridViewLogs.Size = new System.Drawing.Size(1200, 600);
+            this.dataGridViewLogs.RowHeadersWidthSizeMode = System.Windows.Forms.DataGridViewRowHeadersWidthSizeMode.DisableResizing;
+            this.dataGridViewLogs.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.dataGridViewLogs.Size = new System.Drawing.Size(1180, 442);
             this.dataGridViewLogs.TabIndex = 0;
             // 
             // panelBottom
             // 
-            this.panelBottom.Controls.Add(this.lblStatus);
             this.panelBottom.Controls.Add(this.lblLogPath);
+            this.panelBottom.Controls.Add(this.lblStatus);
             this.panelBottom.Controls.Add(this.panelPagination);
             this.panelBottom.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.panelBottom.Location = new System.Drawing.Point(0, 600);
+            this.panelBottom.Location = new System.Drawing.Point(0, 598);
             this.panelBottom.Name = "panelBottom";
-            this.panelBottom.Size = new System.Drawing.Size(1200, 50);
+            this.panelBottom.Size = new System.Drawing.Size(1186, 70);
             this.panelBottom.TabIndex = 2;
-            // 
-            // lblStatus
-            // 
-            this.lblStatus.AutoSize = true;
-            this.lblStatus.Location = new System.Drawing.Point(12, 30);
-            this.lblStatus.Name = "lblStatus";
-            this.lblStatus.Size = new System.Drawing.Size(38, 13);
-            this.lblStatus.TabIndex = 2;
-            this.lblStatus.Text = "Ready";
             // 
             // lblLogPath
             // 
@@ -393,6 +388,15 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.lblLogPath.TabIndex = 1;
             this.lblLogPath.Text = "Log File: ";
             // 
+            // lblStatus
+            // 
+            this.lblStatus.AutoSize = true;
+            this.lblStatus.Location = new System.Drawing.Point(12, 30);
+            this.lblStatus.Name = "lblStatus";
+            this.lblStatus.Size = new System.Drawing.Size(38, 13);
+            this.lblStatus.TabIndex = 2;
+            this.lblStatus.Text = "Ready";
+            // 
             // panelPagination
             // 
             this.panelPagination.Controls.Add(this.btnRefresh);
@@ -402,9 +406,9 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.panelPagination.Controls.Add(this.label5);
             this.panelPagination.Controls.Add(this.cmbPageSize);
             this.panelPagination.Dock = System.Windows.Forms.DockStyle.Right;
-            this.panelPagination.Location = new System.Drawing.Point(500, 0);
+            this.panelPagination.Location = new System.Drawing.Point(486, 0);
             this.panelPagination.Name = "panelPagination";
-            this.panelPagination.Size = new System.Drawing.Size(700, 50);
+            this.panelPagination.Size = new System.Drawing.Size(700, 70);
             this.panelPagination.TabIndex = 0;
             // 
             // btnRefresh
@@ -469,11 +473,11 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.Controls.Add(this.panelTop);
             this.Controls.Add(this.panelMain);
             this.Controls.Add(this.panelBottom);
+            this.Controls.Add(this.panelTop);
             this.Name = "LogViewerControl";
-            this.Size = new System.Drawing.Size(1200, 650);
+            this.Size = new System.Drawing.Size(1186, 668);
             this.panelTop.ResumeLayout(false);
             this.groupBoxSummary.ResumeLayout(false);
             this.tableLayoutPanelSummary.ResumeLayout(false);
@@ -514,7 +518,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanelSummary;
         private System.Windows.Forms.Label lblTotalRecords;
         private System.Windows.Forms.Label lblRecentActivity;
-        private System.Windows.Forms.Label lblErrorCount;
+        private System.Windows.Forms.Label lblUnknownCount;
         private System.Windows.Forms.Label lblCreated;
         private System.Windows.Forms.Label lblModified;
         private System.Windows.Forms.Label lblDeleted;

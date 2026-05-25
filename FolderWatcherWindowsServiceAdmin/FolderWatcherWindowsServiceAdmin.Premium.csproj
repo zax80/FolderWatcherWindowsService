@@ -81,6 +81,12 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="AlertConfigForm.Designer.cs" />
+    <Compile Include="Controls\AiAssistantControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Controls\AiAssistantControl.Designer.cs">
+      <DependentUpon>AiAssistantControl.cs</DependentUpon>
+    </Compile>
     <Compile Include="Controls\LogViewerControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -114,6 +120,7 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <None Include="Controls\AiAssistantControl" />
     <None Include="FolderWatcher" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
@@ -133,6 +140,10 @@
     <ProjectReference Include="..\..\FolderWatcherWindowsService-Licensing\FolderWatcherWindowsService.Licensing\FolderWatcherWindowsService.Licensing.csproj">
       <Project>{3bca3c80-e6ee-4dc3-89ec-d35c21cb4424}</Project>
       <Name>FolderWatcherWindowsService.Licensing</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\FolderWatcherWindowsService-ThreatDetection\FolderWatcherWindowsService.ThreatDetection\FolderWatcherWindowsService.ThreatDetection.csproj">
+      <Project>{f7e8d9a0-b1c2-4d3e-a5f6-7890abcdef12}</Project>
+      <Name>FolderWatcherWindowsService.ThreatDetection</Name>
     </ProjectReference>
     <ProjectReference Include="..\FolderWatcherWindowsService.Common\FolderWatcherWindowsService.Common.csproj">
       <Project>{a1b2c3d4-e5f6-4789-a012-3456789abcde}</Project>

@@ -30,9 +30,9 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
         {
             _allEntries = new List<LogEntry>();
             _filteredEntries = new List<LogEntry>();
-            
+
             InitializeComponent();
-            FixControlOrder(); // Add this line
+            //FixControlOrder(); // Add this line
             InitializeLogViewer();
         }
 
@@ -45,10 +45,10 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             this.Controls.SetChildIndex(this.panelBottom, 0);
             this.Controls.SetChildIndex(this.panelTop, 1);
             this.Controls.SetChildIndex(this.panelMain, 2);
-            
+
             // Ensure panelBottom has enough height for all controls
             panelBottom.Height = 70; // Increase from 50 to 70
-            
+
             // Make sure panelPagination is visible and on top
             panelPagination.BringToFront();
         }
@@ -94,7 +94,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
 
                 // Load only the last 500 entries for faster initial display
                 var recentEntries = await _logParser.ParseLastEntriesAsync(500).ConfigureAwait(false);
-                
+
                 if (this.InvokeRequired)
                 {
                     this.Invoke(new Action(() =>
@@ -183,7 +183,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
 
                 foreach (var path in possiblePaths)
                 {
-                    var logPath = path.EndsWith(".exe") 
+                    var logPath = path.EndsWith(".exe")
                         ? Path.Combine(Path.GetDirectoryName(path), "ServiceLog.txt")
                         : path;
 
@@ -193,7 +193,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
                     {
                         _logFilePath = logPath;
                         System.Diagnostics.Debug.WriteLine($"Found log file at: {_logFilePath}");
-                        
+
                         // ✅ CRITICAL: Ensure log file is READ-ONLY access
                         // This prevents any accidental deletion or modification of the log file
                         EnsureLogFileProtection(_logFilePath);
@@ -207,7 +207,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
                     System.Diagnostics.Debug.WriteLine($"Using default log file path: {_logFilePath}");
                 }
 
-                lblLogPath.Text = $"Log File: {_logFilePath} [READ-ONLY ACCESS]";
+                lblLogPath.Text = $"Log File: {_logFilePath}";
                 _logParser = new LogParser(_logFilePath);
 
                 // Diagnose the log file to understand its structure
@@ -223,7 +223,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error in FindLogFile: {ex.Message}");
-                MessageBox.Show($"Error finding log file: {ex.Message}", "Error", 
+                MessageBox.Show($"Error finding log file: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
@@ -268,13 +268,14 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             // Clear existing columns
             dataGridViewLogs.Columns.Clear();
 
-            // Add columns exactly as shown in the screenshot
+            // Add LogLevel column (HIDDEN)
             dataGridViewLogs.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "LogLevel",
                 HeaderText = "LogLevel",
                 DataPropertyName = "LogLevel",
                 Width = 70,
+                Visible = false, // HIDDEN
                 DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter }
             });
 
@@ -360,12 +361,14 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
                 Width = 120
             });
 
+            // Add Error column (HIDDEN)
             dataGridViewLogs.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "Error",
                 HeaderText = "Error",
                 DataPropertyName = "Error",
-                Width = 80
+                Width = 80,
+                Visible = false // HIDDEN
             });
 
             dataGridViewLogs.Columns.Add(new DataGridViewTextBoxColumn
@@ -665,7 +668,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
 
             // Debug: Log information about the filtered entries
             System.Diagnostics.Debug.WriteLine($"UpdateSummary: Processing {_filteredEntries.Count} filtered entries");
-            
+
             // Sample a few entries for debugging
             if (_filteredEntries.Any())
             {
@@ -673,16 +676,16 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
                 var lastEntry = _filteredEntries.Last();
                 System.Diagnostics.Debug.WriteLine($"First entry: LogLevel={firstEntry.LogLevel}, Error='{firstEntry.Error}', ChangeType={firstEntry.ChangeType}, Timestamp={firstEntry.Timestamp:yyyy-MM-dd HH:mm:ss}");
                 System.Diagnostics.Debug.WriteLine($"Last entry: LogLevel={lastEntry.LogLevel}, Error='{lastEntry.Error}', ChangeType={lastEntry.ChangeType}, Timestamp={lastEntry.Timestamp:yyyy-MM-dd HH:mm:ss}");
-                
+
                 // Count different types for debugging
                 var errorEntries = _filteredEntries.Where(e => !string.IsNullOrWhiteSpace(e.Error)).ToList();
                 var errorLogLevel = _filteredEntries.Where(e => e.LogLevel.Equals("ERROR", StringComparison.OrdinalIgnoreCase)).ToList();
                 var recentEntries = _filteredEntries.Where(e => e.Timestamp >= DateTime.Now.AddMinutes(-30)).ToList();
-                
+
                 System.Diagnostics.Debug.WriteLine($"Entries with Error field: {errorEntries.Count}");
                 System.Diagnostics.Debug.WriteLine($"Entries with ERROR LogLevel: {errorLogLevel.Count}");
                 System.Diagnostics.Debug.WriteLine($"Recent entries (30m): {recentEntries.Count}");
-                
+
                 if (errorEntries.Any())
                 {
                     System.Diagnostics.Debug.WriteLine($"Sample error entry: {errorEntries.First().Error}");
@@ -693,7 +696,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
 
             lblTotalRecords.Text = $"Total Records: {summary.TotalRecords:N0}";
             lblRecentActivity.Text = $"Recent Activity (30m): {summary.RecentActivityCount:N0}";
-            lblErrorCount.Text = $"Errors: {summary.ErrorCount:N0}";
+            lblUnknownCount.Text = $"Unknowns: {summary.UnknownCount:N0}";
             lblCreated.Text = $"Created: {summary.CreatedCount:N0}";
             lblModified.Text = $"Modified: {summary.ModifiedCount:N0}";
             lblDeleted.Text = $"Deleted: {summary.DeletedCount:N0}";
@@ -707,9 +710,9 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             {
                 lblLastUpdate.Text = "Last Entry: None";
             }
-            
+
             // Debug: Log the final summary values
-            System.Diagnostics.Debug.WriteLine($"Summary - Total: {summary.TotalRecords}, Errors: {summary.ErrorCount}, Recent: {summary.RecentActivityCount}");
+            System.Diagnostics.Debug.WriteLine($"Summary - Total: {summary.TotalRecords}, Unknowns: {summary.UnknownCount}, Recent: {summary.RecentActivityCount}");
         }
 
         private void UpdatePagination()
@@ -781,20 +784,20 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
             var sb = new StringBuilder();
             sb.AppendLine($"Log File: {_logFilePath}");
             sb.AppendLine($"File Exists: {File.Exists(_logFilePath)}");
-            
+
             if (File.Exists(_logFilePath))
             {
                 var fileInfo = new FileInfo(_logFilePath);
                 sb.AppendLine($"File Size: {fileInfo.Length:N0} bytes");
                 sb.AppendLine($"Last Modified: {fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}");
             }
-            
+
             sb.AppendLine();
             sb.AppendLine($"All Entries Count: {_allEntries.Count:N0}");
             sb.AppendLine($"Filtered Entries Count: {_filteredEntries.Count:N0}");
             sb.AppendLine($"Current Page: {_currentPage + 1}");
             sb.AppendLine($"Page Size: {_pageSize}");
-            
+
             if (_filteredEntries.Any())
             {
                 sb.AppendLine();
@@ -804,19 +807,19 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
                 sb.AppendLine($"  ChangeType: '{firstEntry.ChangeType}'");
                 sb.AppendLine($"  Error Field: '{firstEntry.Error}'");
                 sb.AppendLine($"  Timestamp: {firstEntry.Timestamp:yyyy-MM-dd HH:mm:ss}");
-                
+
                 var now = DateTime.Now;
                 var recentThreshold = now.AddMinutes(-30);
                 var isRecent = firstEntry.Timestamp >= recentThreshold;
                 sb.AppendLine($"  Is Recent (30m): {isRecent}");
                 sb.AppendLine($"  Current Time: {now:yyyy-MM-dd HH:mm:ss}");
                 sb.AppendLine($"  Recent Threshold: {recentThreshold:yyyy-MM-dd HH:mm:ss}");
-                
+
                 // Count different types
                 var errorEntries = _filteredEntries.Count(e => !string.IsNullOrWhiteSpace(e.Error));
                 var errorLogLevel = _filteredEntries.Count(e => e.LogLevel.Equals("ERROR", StringComparison.OrdinalIgnoreCase));
                 var recentEntries = _filteredEntries.Count(e => e.Timestamp >= recentThreshold);
-                
+
                 sb.AppendLine();
                 sb.AppendLine("Entry Type Counts:");
                 sb.AppendLine($"  Entries with Error field: {errorEntries}");
@@ -827,7 +830,7 @@ namespace FolderWatcherWindowsServiceAdmin.Controls
                 sb.AppendLine($"  Deleted: {_filteredEntries.Count(e => e.ChangeType.Equals("Deleted", StringComparison.OrdinalIgnoreCase))}");
                 sb.AppendLine($"  Renamed: {_filteredEntries.Count(e => e.ChangeType.Equals("Renamed", StringComparison.OrdinalIgnoreCase))}");
             }
-            
+
             MessageBox.Show(sb.ToString(), "Log Viewer Diagnostic Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 

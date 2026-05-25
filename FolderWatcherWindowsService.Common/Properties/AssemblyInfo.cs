@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("FolderWatcherWindowsService.Common")]
 [assembly: AssemblyDescription("Common shared types and interfaces for Folder Watcher service and admin")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("Balkan Enterprise Solutions Ltd")]
 [assembly: AssemblyProduct("FolderWatcherWindowsService.Common")]
 [assembly: AssemblyCopyright("Copyright © 2023")]
 [assembly: AssemblyTrademark("")]

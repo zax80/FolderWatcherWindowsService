@@ -37,7 +37,7 @@ namespace FolderWatcherWindowsService
             }
             catch (Exception)
             {
-                data.FileType = "Error";
+                data.FileType = "Unknown";
             }
 
             return data;
